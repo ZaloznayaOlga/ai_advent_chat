@@ -2,11 +2,22 @@
 
 Android-приложение для общения с ИИ через чат, использующее DeepSeek API.
 
+## Возможности
+
+- Чат с ИИ через DeepSeek API
+- **Структурированные ответы** — ИИ отвечает в формате JSON, который парсится и отображается в красивом виде
+- Отображение метаданных ответа: дата, время, тема, язык
+- Теги и ссылки в ответах
+- **Просмотр исходного JSON** с подсветкой синтаксиса
+- Копирование JSON в буфер обмена
+- Информативные сообщения об ошибках на русском языке
+
 ## Скриншот
 
 Приложение представляет собой экран чата с:
 - Заголовком "AI Chat" в верхней части
-- Областью сообщений на весь экран
+- Областью сообщений с форматированными ответами
+- Секциями: Дата, Время, Язык, Тема, Вопрос, Ответ, Теги, Ссылки, JSON
 - Полем ввода и кнопкой отправки внизу
 
 ## Настройка API ключа
@@ -45,42 +56,51 @@ Android-приложение для общения с ИИ через чат, и
 Проект построен по принципам **Clean Architecture** с использованием паттерна **MVVM**.
 
 ```
-app/src/main/java/com/olgaz/aichat/
-├── data/                           # Data Layer
-│   ├── remote/
-│   │   ├── api/
-│   │   │   └── DeepSeekApi.kt      # Retrofit API interface
-│   │   └── dto/
-│   │       ├── ChatRequestDto.kt   # Request DTO
-│   │       └── ChatResponseDto.kt  # Response DTO
-│   └── repository/
-│       └── ChatRepositoryImpl.kt   # Repository implementation
+app/src/main/
+├── assets/
+│   └── system-prompt.txt           # Системный промпт для JSON формата
 │
-├── domain/                         # Domain Layer
-│   ├── model/
-│   │   └── Message.kt              # Domain model
-│   ├── repository/
-│   │   └── ChatRepository.kt       # Repository interface
-│   └── usecase/
-│       └── SendMessageUseCase.kt   # Business logic
-│
-├── presentation/                   # Presentation Layer
-│   └── chat/
-│       ├── ChatScreen.kt           # Compose UI
-│       ├── ChatViewModel.kt        # ViewModel
-│       └── ChatUiState.kt          # UI State
-│
-├── di/                             # Dependency Injection
-│   ├── NetworkModule.kt            # Network dependencies
-│   └── RepositoryModule.kt         # Repository bindings
-│
-├── ui/theme/                       # Material3 Theme
-│   ├── Color.kt
-│   ├── Theme.kt
-│   └── Type.kt
-│
-├── AIChatApplication.kt            # Hilt Application
-└── MainActivity.kt                 # Entry point
+└── java/com/olgaz/aichat/
+    ├── data/                           # Data Layer
+    │   ├── provider/
+    │   │   └── SystemPromptProviderImpl.kt  # Загрузка промпта из assets
+    │   ├── remote/
+    │   │   ├── api/
+    │   │   │   └── DeepSeekApi.kt      # Retrofit API interface
+    │   │   └── dto/
+    │   │       ├── AiResponseJsonDto.kt # DTO для JSON ответа ИИ
+    │   │       ├── ChatRequestDto.kt   # Request DTO
+    │   │       └── ChatResponseDto.kt  # Response DTO
+    │   └── repository/
+    │       └── ChatRepositoryImpl.kt   # Repository + JSON parsing
+    │
+    ├── domain/                         # Domain Layer
+    │   ├── model/
+    │   │   └── Message.kt              # Domain model + MessageJsonData
+    │   ├── provider/
+    │   │   └── SystemPromptProvider.kt # Интерфейс провайдера промпта
+    │   ├── repository/
+    │   │   └── ChatRepository.kt       # Repository interface
+    │   └── usecase/
+    │       └── SendMessageUseCase.kt   # Business logic
+    │
+    ├── presentation/                   # Presentation Layer
+    │   └── chat/
+    │       ├── ChatScreen.kt           # Compose UI + JSON viewer
+    │       ├── ChatViewModel.kt        # ViewModel
+    │       └── ChatUiState.kt          # UI State
+    │
+    ├── di/                             # Dependency Injection
+    │   ├── NetworkModule.kt            # Network dependencies
+    │   └── RepositoryModule.kt         # Repository + Provider bindings
+    │
+    ├── ui/theme/                       # Material3 Theme
+    │   ├── Color.kt
+    │   ├── Theme.kt
+    │   └── Type.kt
+    │
+    ├── AIChatApplication.kt            # Hilt Application
+    └── MainActivity.kt                 # Entry point
 ```
 
 ### Слои архитектуры
@@ -88,6 +108,42 @@ app/src/main/java/com/olgaz/aichat/
 - **Data Layer** — работа с сетью (Retrofit, OkHttp), DTO, реализация репозиториев
 - **Domain Layer** — бизнес-логика, модели, интерфейсы репозиториев, use cases
 - **Presentation Layer** — UI (Jetpack Compose), ViewModel, UI State
+
+## Формат ответа ИИ
+
+ИИ настроен отвечать в структурированном JSON формате:
+
+```json
+{
+  "datetime": "2026-01-13T22:42:00",
+  "topic": "Тема вопроса",
+  "question": "Исходный вопрос пользователя",
+  "answer": "Подробный ответ с форматированием",
+  "tags": ["tag1", "tag2", "tag3"],
+  "links": ["https://example.com"],
+  "language": "ru"
+}
+```
+
+### Отображение в UI
+
+Ответ парсится и отображается в виде секций с рамками:
+- **Дата** — форматированная дата (например, "13 января 2026")
+- **Время** — время ответа
+- **Язык** — код языка (RU, EN, и т.д.)
+- **Тема** — краткая тема вопроса
+- **Вопрос** — исходный вопрос
+- **Ответ** — основной текст ответа
+- **Теги** — релевантные теги в виде чипсов
+- **Ссылки** — кликабельные ссылки
+- **JSON** — кнопка для просмотра исходного JSON
+
+### Просмотр JSON
+
+При нажатии на кнопку "Показать исходный JSON" открывается диалог с:
+- Подсветкой синтаксиса (ключи — голубые, значения — зелёные, скобки — белые)
+- Прокруткой для длинных ответов
+- Кнопкой копирования в буфер обмена
 
 ## Обработка ошибок
 
