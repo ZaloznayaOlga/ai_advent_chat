@@ -7,13 +7,19 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -21,15 +27,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -43,7 +55,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,9 +78,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.olgaz.aichat.domain.model.Message
+import com.olgaz.aichat.domain.model.MessageJsonData
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
 import com.olgaz.aichat.ui.theme.GradientDarkStart
@@ -212,24 +236,14 @@ private fun MessageItem(message: Message) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-        Card(
-            modifier = Modifier.widthIn(max = 300.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isUser) GreenUser else GreenAssistant
-            )
-        ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(12.dp),
-                color = Color.Black,
-                style = MaterialTheme.typography.bodyMedium
-            )
+        if (isUser) {
+            UserMessageCard(message.content)
+        } else {
+            if (message.jsonData != null) {
+                AssistantStructuredMessage(jsonData = message.jsonData)
+            } else {
+                AssistantSimpleMessageCard(message.content)
+            }
         }
 
         Text(
@@ -238,6 +252,512 @@ private fun MessageItem(message: Message) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         )
+    }
+}
+
+@Composable
+private fun UserMessageCard(content: String) {
+    Card(
+        modifier = Modifier.widthIn(max = 300.dp),
+        shape = RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomStart = 16.dp,
+            bottomEnd = 4.dp
+        ),
+        colors = CardDefaults.cardColors(containerColor = GreenUser)
+    ) {
+        Text(
+            text = content,
+            modifier = Modifier.padding(12.dp),
+            color = Color.Black,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun AssistantSimpleMessageCard(content: String) {
+    Card(
+        modifier = Modifier.widthIn(max = 300.dp),
+        shape = RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomStart = 4.dp,
+            bottomEnd = 16.dp
+        ),
+        colors = CardDefaults.cardColors(containerColor = GreenAssistant)
+    ) {
+        Text(
+            text = content,
+            modifier = Modifier.padding(12.dp),
+            color = Color.Black,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
+    val uriHandler = LocalUriHandler.current
+    val borderColor = Color.Gray.copy(alpha = 0.4f)
+    var showJsonDialog by remember { mutableStateOf(false) }
+
+    val (formattedDate, formattedTime) = remember(jsonData.datetime) {
+        formatDateTime(jsonData.datetime)
+    }
+
+    if (showJsonDialog) {
+        JsonViewerDialog(
+            jsonContent = jsonData.rawJson,
+            onDismiss = { showJsonDialog = false }
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = GreenAssistant)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header row: date, time, language
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LabeledSection(
+                    label = "Дата",
+                    borderColor = borderColor,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = formattedDate,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black
+                    )
+                }
+
+                LabeledSection(
+                    label = "Время",
+                    borderColor = borderColor
+                ) {
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black
+                    )
+                }
+
+                LabeledSection(
+                    label = "Язык",
+                    borderColor = borderColor
+                ) {
+                    Text(
+                        text = jsonData.language.uppercase(),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            // Topic
+            LabeledSection(
+                label = "Тема",
+                borderColor = borderColor,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = jsonData.topic,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black
+                )
+            }
+
+            // Question
+            LabeledSection(
+                label = "Вопрос",
+                borderColor = borderColor,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = jsonData.question,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black
+                )
+            }
+
+            // Answer - main content
+            LabeledSection(
+                label = "Ответ",
+                borderColor = borderColor,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = jsonData.answer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black
+                )
+            }
+
+            // Tags
+            if (jsonData.tags.isNotEmpty()) {
+                LabeledSection(
+                    label = "Теги",
+                    borderColor = borderColor,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        jsonData.tags.forEach { tag ->
+                            TagChip(tag = tag)
+                        }
+                    }
+                }
+            }
+
+            // Links
+            if (jsonData.links.isNotEmpty()) {
+                LabeledSection(
+                    label = "Ссылки",
+                    borderColor = borderColor,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        jsonData.links.forEach { link ->
+                            Text(
+                                text = link,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF1976D2),
+                                textDecoration = TextDecoration.Underline,
+                                modifier = Modifier.clickable {
+                                    try {
+                                        uriHandler.openUri(link)
+                                    } catch (_: Exception) { }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // JSON section
+            LabeledSection(
+                label = "JSON",
+                borderColor = borderColor,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = { showJsonDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF81C784)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Показать исходный JSON",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LabeledSection(
+    label: String,
+    borderColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .border(
+                width = 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(8.dp)
+    ) {
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun TagChip(tag: String) {
+    Box(
+        modifier = Modifier
+            .background(
+                color = Color(0xFF81C784).copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = Color(0xFF388E3C).copy(alpha = 0.5f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = "#$tag",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF2E7D32),
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+private fun formatDateTime(isoDateTime: String): Pair<String, String> {
+    return try {
+        val months = listOf(
+            "января", "февраля", "марта", "апреля", "мая", "июня",
+            "июля", "августа", "сентября", "октября", "ноября", "декабря"
+        )
+
+        val datePart = isoDateTime.substringBefore("T")
+        val timePart = isoDateTime.substringAfter("T").take(5)
+
+        val parts = datePart.split("-")
+        if (parts.size == 3) {
+            val year = parts[0]
+            val month = parts[1].toIntOrNull()?.minus(1) ?: 0
+            val day = parts[2].toIntOrNull() ?: 1
+
+            val monthName = months.getOrElse(month) { "???" }
+            Pair("$day $monthName $year", timePart)
+        } else {
+            Pair(isoDateTime, "")
+        }
+    } catch (e: Exception) {
+        Pair(isoDateTime, "")
+    }
+}
+
+@Composable
+private fun JsonViewerDialog(
+    jsonContent: String,
+    onDismiss: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val scrollState = rememberScrollState()
+
+    val highlightedJson = remember(jsonContent) {
+        highlightJsonSyntax(jsonContent)
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF2D2D2D)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Исходный JSON",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    TextButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(jsonContent))
+                        }
+                    ) {
+                        Text(
+                            text = "Копировать",
+                            color = Color(0xFF81C784)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // JSON content with scroll and syntax highlighting
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp)
+                        .background(
+                            color = Color(0xFF1E1E1E),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = highlightedJson,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.verticalScroll(scrollState)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Close button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF388E3C)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(text = "Закрыть")
+                }
+            }
+        }
+    }
+}
+
+private fun highlightJsonSyntax(json: String): AnnotatedString {
+    val bracketColor = Color.White
+    val keyColor = Color(0xFF9CDCFE)      // Light blue
+    val valueStringColor = Color(0xFF6A9955)  // Green
+    val valueNumberColor = Color(0xFFB5CEA8)  // Light green for numbers
+    val valueBoolNullColor = Color(0xFF569CD6) // Blue for true/false/null
+
+    return buildAnnotatedString {
+        var i = 0
+        var inString = false
+        var isKey = false
+        var afterColon = false
+
+        while (i < json.length) {
+            val char = json[i]
+
+            when {
+                // Handle escape sequences in strings
+                char == '\\' && inString && i + 1 < json.length -> {
+                    val color = if (isKey) keyColor else valueStringColor
+                    withStyle(SpanStyle(color = color)) {
+                        append(char)
+                        append(json[i + 1])
+                    }
+                    i += 2
+                    continue
+                }
+
+                // String start/end
+                char == '"' -> {
+                    if (!inString) {
+                        inString = true
+                        isKey = !afterColon
+                        val color = if (isKey) keyColor else valueStringColor
+                        withStyle(SpanStyle(color = color)) {
+                            append(char)
+                        }
+                    } else {
+                        val color = if (isKey) keyColor else valueStringColor
+                        withStyle(SpanStyle(color = color)) {
+                            append(char)
+                        }
+                        inString = false
+                        if (isKey) {
+                            isKey = false
+                        }
+                    }
+                }
+
+                // Inside string
+                inString -> {
+                    val color = if (isKey) keyColor else valueStringColor
+                    withStyle(SpanStyle(color = color)) {
+                        append(char)
+                    }
+                }
+
+                // Brackets and braces
+                char in "{}[]" -> {
+                    withStyle(SpanStyle(color = bracketColor)) {
+                        append(char)
+                    }
+                    if (char == '{' || char == '[') {
+                        afterColon = false
+                    }
+                }
+
+                // Colon
+                char == ':' -> {
+                    withStyle(SpanStyle(color = bracketColor)) {
+                        append(char)
+                    }
+                    afterColon = true
+                }
+
+                // Comma
+                char == ',' -> {
+                    withStyle(SpanStyle(color = bracketColor)) {
+                        append(char)
+                    }
+                    afterColon = false
+                }
+
+                // Numbers
+                char.isDigit() || (char == '-' && i + 1 < json.length && json[i + 1].isDigit()) -> {
+                    val numberBuilder = StringBuilder()
+                    while (i < json.length && (json[i].isDigit() || json[i] in ".-+eE")) {
+                        numberBuilder.append(json[i])
+                        i++
+                    }
+                    withStyle(SpanStyle(color = valueNumberColor)) {
+                        append(numberBuilder.toString())
+                    }
+                    continue
+                }
+
+                // true, false, null
+                char == 't' || char == 'f' || char == 'n' -> {
+                    val keyword = when {
+                        json.substring(i).startsWith("true") -> "true"
+                        json.substring(i).startsWith("false") -> "false"
+                        json.substring(i).startsWith("null") -> "null"
+                        else -> null
+                    }
+                    if (keyword != null) {
+                        withStyle(SpanStyle(color = valueBoolNullColor)) {
+                            append(keyword)
+                        }
+                        i += keyword.length
+                        continue
+                    } else {
+                        append(char)
+                    }
+                }
+
+                // Whitespace and other characters
+                else -> {
+                    append(char)
+                }
+            }
+            i++
+        }
     }
 }
 
@@ -267,7 +787,7 @@ private fun ThinkingIndicator() {
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "Думаю, подождите, пожалуйста$dots",
+                text = "🤔  Думаю$dots",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Black
             )
