@@ -12,10 +12,13 @@ import com.olgaz.aichat.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
+import android.util.Log
 import retrofit2.HttpException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+
+private const val TAG = "ChatRepository"
 
 class ChatRepositoryImpl @Inject constructor(
     private val api: DeepSeekApi,
@@ -77,6 +80,8 @@ class ChatRepositoryImpl @Inject constructor(
                     )
                 )
             } catch (e: Exception) {
+                Log.w(TAG, "JSON parsing failed, showing raw content", e)
+                Log.d(TAG, "Raw response: $rawContent")
                 Message(
                     content = rawContent,
                     role = MessageRole.ASSISTANT,

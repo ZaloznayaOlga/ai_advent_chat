@@ -279,13 +279,8 @@ private fun UserMessageCard(content: String) {
 @Composable
 private fun AssistantSimpleMessageCard(content: String) {
     Card(
-        modifier = Modifier.widthIn(max = 300.dp),
-        shape = RoundedCornerShape(
-            topStart = 16.dp,
-            topEnd = 16.dp,
-            bottomStart = 4.dp,
-            bottomEnd = 16.dp
-        ),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = GreenAssistant)
     ) {
         Text(
@@ -304,10 +299,6 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
     val borderColor = Color.Gray.copy(alpha = 0.4f)
     var showJsonDialog by remember { mutableStateOf(false) }
 
-    val (formattedDate, formattedTime) = remember(jsonData.datetime) {
-        formatDateTime(jsonData.datetime)
-    }
-
     if (showJsonDialog) {
         JsonViewerDialog(
             jsonContent = jsonData.rawJson,
@@ -324,47 +315,6 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header row: date, time, language
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                LabeledSection(
-                    label = "Дата",
-                    borderColor = borderColor,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = formattedDate,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Black
-                    )
-                }
-
-                LabeledSection(
-                    label = "Время",
-                    borderColor = borderColor
-                ) {
-                    Text(
-                        text = formattedTime,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Black
-                    )
-                }
-
-                LabeledSection(
-                    label = "Язык",
-                    borderColor = borderColor
-                ) {
-                    Text(
-                        text = jsonData.language.uppercase(),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Black
-                    )
-                }
-            }
-
             // Topic
             LabeledSection(
                 label = "Тема",
