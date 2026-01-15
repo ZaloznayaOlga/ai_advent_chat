@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -85,6 +86,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
 import com.olgaz.aichat.domain.model.MessageRole
+import com.olgaz.aichat.domain.model.ResponseFormat
+import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
 import com.olgaz.aichat.ui.theme.GradientDarkStart
 import com.olgaz.aichat.ui.theme.GradientLightEnd
@@ -117,6 +120,14 @@ fun ChatScreen(
 
     val chatBackgroundColor = if (isDarkTheme) GreyDark else GreyLight
 
+    if (uiState.isSettingsDialogVisible) {
+        SettingsDialog(
+            settings = uiState.settings,
+            onSettingsChange = viewModel::updateSettings,
+            onDismiss = viewModel::hideSettingsDialog
+        )
+    }
+
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
@@ -143,6 +154,15 @@ fun ChatScreen(
                             text = "AI Chat",
                             style = MaterialTheme.typography.titleLarge
                         )
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.showSettingsDialog() }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Настройки",
+                                tint = Color.White
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
@@ -203,7 +223,8 @@ fun ChatScreen(
                 onTextChange = viewModel::onInputTextChanged,
                 onSendClick = viewModel::sendMessage,
                 isLoading = uiState.isLoading,
-                gradientBrush = gradientBrush
+                gradientBrush = gradientBrush,
+                sendMessageMode = uiState.settings.sendMessageMode
             )
         }
     }
@@ -300,8 +321,9 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
     var showJsonDialog by remember { mutableStateOf(false) }
 
     if (showJsonDialog) {
-        JsonViewerDialog(
-            jsonContent = jsonData.rawJson,
+        SourceViewerDialog(
+            content = jsonData.rawJson,
+            responseFormat = jsonData.responseFormat,
             onDismiss = { showJsonDialog = false }
         )
     }
@@ -398,9 +420,17 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
                 }
             }
 
-            // JSON section
+            // Source data section (JSON/XML)
+            val formatLabel = when (jsonData.responseFormat) {
+                ResponseFormat.XML -> "XML"
+                else -> "JSON"
+            }
+            val buttonText = when (jsonData.responseFormat) {
+                ResponseFormat.XML -> "Показать исходный XML"
+                else -> "Показать исходный JSON"
+            }
             LabeledSection(
-                label = "JSON",
+                label = formatLabel,
                 borderColor = borderColor,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -412,7 +442,7 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Показать исходный JSON",
+                        text = buttonText,
                         style = MaterialTheme.typography.labelMedium,
                         color = Color.Black
                     )
@@ -502,15 +532,24 @@ private fun formatDateTime(isoDateTime: String): Pair<String, String> {
 }
 
 @Composable
-private fun JsonViewerDialog(
-    jsonContent: String,
+private fun SourceViewerDialog(
+    content: String,
+    responseFormat: ResponseFormat,
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     val scrollState = rememberScrollState()
 
-    val highlightedJson = remember(jsonContent) {
-        highlightJsonSyntax(jsonContent)
+    val highlightedContent = remember(content, responseFormat) {
+        when (responseFormat) {
+            ResponseFormat.XML -> highlightXmlSyntax(content)
+            else -> highlightJsonSyntax(content)
+        }
+    }
+
+    val title = when (responseFormat) {
+        ResponseFormat.XML -> "Исходный XML"
+        else -> "Исходный JSON"
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -530,7 +569,7 @@ private fun JsonViewerDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Исходный JSON",
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -538,7 +577,7 @@ private fun JsonViewerDialog(
 
                     TextButton(
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(jsonContent))
+                            clipboardManager.setText(AnnotatedString(content))
                         }
                     ) {
                         Text(
@@ -550,7 +589,7 @@ private fun JsonViewerDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // JSON content with scroll and syntax highlighting
+                // Content with scroll and syntax highlighting
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -562,7 +601,7 @@ private fun JsonViewerDialog(
                         .padding(12.dp)
                 ) {
                     Text(
-                        text = highlightedJson,
+                        text = highlightedContent,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.verticalScroll(scrollState)
                     )
@@ -711,6 +750,64 @@ private fun highlightJsonSyntax(json: String): AnnotatedString {
     }
 }
 
+private fun highlightXmlSyntax(xml: String): AnnotatedString {
+    val tagColor = Color(0xFF569CD6)        // Blue for tags
+    val attrNameColor = Color(0xFF9CDCFE)   // Light blue for attribute names
+    val attrValueColor = Color(0xFFCE9178)  // Orange for attribute values
+    val contentColor = Color(0xFFD4D4D4)    // Light gray for content
+    val commentColor = Color(0xFF6A9955)    // Green for comments
+
+    return buildAnnotatedString {
+        var i = 0
+        while (i < xml.length) {
+            when {
+                // XML comment
+                xml.substring(i).startsWith("<!--") -> {
+                    val endIndex = xml.indexOf("-->", i)
+                    val comment = if (endIndex != -1) {
+                        xml.substring(i, endIndex + 3)
+                    } else {
+                        xml.substring(i)
+                    }
+                    withStyle(SpanStyle(color = commentColor)) {
+                        append(comment)
+                    }
+                    i += comment.length
+                }
+                // XML declaration or tag
+                xml[i] == '<' -> {
+                    val endIndex = xml.indexOf('>', i)
+                    if (endIndex != -1) {
+                        val tag = xml.substring(i, endIndex + 1)
+                        withStyle(SpanStyle(color = tagColor)) {
+                            append(tag)
+                        }
+                        i = endIndex + 1
+                    } else {
+                        withStyle(SpanStyle(color = tagColor)) {
+                            append(xml[i])
+                        }
+                        i++
+                    }
+                }
+                // Content between tags
+                else -> {
+                    val nextTagIndex = xml.indexOf('<', i)
+                    val content = if (nextTagIndex != -1) {
+                        xml.substring(i, nextTagIndex)
+                    } else {
+                        xml.substring(i)
+                    }
+                    withStyle(SpanStyle(color = contentColor)) {
+                        append(content)
+                    }
+                    i += content.length
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ThinkingIndicator() {
     val infiniteTransition = rememberInfiniteTransition(label = "dots")
@@ -751,7 +848,8 @@ private fun MessageInput(
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
     isLoading: Boolean,
-    gradientBrush: Brush
+    gradientBrush: Brush,
+    sendMessageMode: SendMessageMode
 ) {
     Row(
         modifier = Modifier
@@ -768,13 +866,27 @@ private fun MessageInput(
                 .weight(1f)
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
-                        if (keyEvent.isShiftPressed) {
-                            false
-                        } else {
-                            if (text.isNotBlank() && !isLoading) {
-                                onSendClick()
+                        when (sendMessageMode) {
+                            SendMessageMode.ENTER -> {
+                                if (keyEvent.isShiftPressed) {
+                                    false
+                                } else {
+                                    if (text.isNotBlank() && !isLoading) {
+                                        onSendClick()
+                                    }
+                                    true
+                                }
                             }
-                            true
+                            SendMessageMode.SHIFT_ENTER -> {
+                                if (keyEvent.isShiftPressed) {
+                                    if (text.isNotBlank() && !isLoading) {
+                                        onSendClick()
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                         }
                     } else {
                         false

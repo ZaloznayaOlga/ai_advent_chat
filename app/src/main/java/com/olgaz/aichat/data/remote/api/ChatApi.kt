@@ -5,7 +5,7 @@ import com.olgaz.aichat.data.remote.dto.ChatResponseDto
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-interface DeepSeekApi {
+interface ChatApi {
 
     @POST("chat/completions")
     suspend fun sendMessage(@Body request: ChatRequestDto): ChatResponseDto

@@ -2,6 +2,7 @@ package com.olgaz.aichat.presentation.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.usecase.SendMessageUseCase
@@ -44,7 +45,7 @@ class ChatViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            sendMessageUseCase(_uiState.value.messages).collect { result ->
+            sendMessageUseCase(_uiState.value.messages, _uiState.value.settings).collect { result ->
                 result.fold(
                     onSuccess = { assistantMessage ->
                         _uiState.update {
@@ -69,5 +70,17 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun showSettingsDialog() {
+        _uiState.update { it.copy(isSettingsDialogVisible = true) }
+    }
+
+    fun hideSettingsDialog() {
+        _uiState.update { it.copy(isSettingsDialogVisible = false) }
+    }
+
+    fun updateSettings(settings: ChatSettings) {
+        _uiState.update { it.copy(settings = settings) }
     }
 }

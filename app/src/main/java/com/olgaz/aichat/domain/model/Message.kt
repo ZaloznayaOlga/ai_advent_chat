@@ -11,7 +11,7 @@ data class Message(
 )
 
 /**
- * Structured data parsed from AI JSON response.
+ * Structured data parsed from AI response (JSON or XML).
  * Only populated for ASSISTANT messages.
  */
 data class MessageJsonData(
@@ -22,7 +22,8 @@ data class MessageJsonData(
     val tags: List<String>,
     val links: List<String>,
     val language: String,
-    val rawJson: String
+    val rawJson: String,
+    val responseFormat: ResponseFormat = ResponseFormat.JSON
 )
 
 enum class MessageRole {

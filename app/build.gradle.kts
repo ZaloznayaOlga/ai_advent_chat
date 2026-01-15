@@ -31,6 +31,8 @@ android {
 
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"${localProperties.getProperty("DEEPSEEK_API_KEY", "")}\"")
         buildConfigField("String", "DEEPSEEK_BASE_URL", "\"https://api.deepseek.com/\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties.getProperty("OPENAI_API_KEY", "")}\"")
+        buildConfigField("String", "OPENAI_BASE_URL", "\"https://api.openai.com/v1/\"")
     }
 
     buildTypes {
