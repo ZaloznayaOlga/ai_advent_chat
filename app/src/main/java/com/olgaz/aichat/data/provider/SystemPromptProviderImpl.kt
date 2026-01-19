@@ -1,8 +1,10 @@
 package com.olgaz.aichat.data.provider
 
 import android.content.Context
+import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
 import com.olgaz.aichat.domain.model.ResponseFormat
+import com.olgaz.aichat.domain.model.SystemPromptMode
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -49,5 +51,21 @@ class SystemPromptProviderImpl @Inject constructor(
         return context.assets.open(fileName)
             .bufferedReader()
             .use { it.readText() }
+    }
+
+    override fun getSystemPrompt(settings: ChatSettings): String {
+        return when (settings.systemPromptMode) {
+            SystemPromptMode.DEFAULT -> getSystemPrompt(
+                settings.communicationStyle,
+                settings.responseFormat
+            )
+            SystemPromptMode.CUSTOM -> {
+                if (settings.customSystemPrompt.isBlank()) {
+                    getSystemPrompt(settings.communicationStyle, settings.responseFormat)
+                } else {
+                    settings.customSystemPrompt
+                }
+            }
+        }
     }
 }

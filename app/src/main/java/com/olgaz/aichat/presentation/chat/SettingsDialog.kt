@@ -30,23 +30,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.material3.Button
 import com.olgaz.aichat.domain.model.AiModel
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
+import com.olgaz.aichat.domain.model.SystemPromptMode
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsDialog(
     settings: ChatSettings,
     onSettingsChange: (ChatSettings) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -66,27 +73,27 @@ fun SettingsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    DropdownSettingItem(
-                        label = "Провайдер",
-                        selectedValue = settings.provider.displayName,
-                        options = AiProvider.entries.map { it.displayName },
-                        onOptionSelected = { displayName ->
-                            val provider = AiProvider.entries.first { it.displayName == displayName }
-                            val newModel = AiModel.defaultForProvider(provider)
-                            onSettingsChange(settings.copy(provider = provider, model = newModel))
-                        }
-                    )
-
-                    val availableModels = AiModel.forProvider(settings.provider)
-                    DropdownSettingItem(
-                        label = "Модель",
-                        selectedValue = settings.model.displayName,
-                        options = availableModels.map { it.displayName },
-                        onOptionSelected = { displayName ->
-                            val model = availableModels.first { it.displayName == displayName }
-                            onSettingsChange(settings.copy(model = model))
-                        }
-                    )
+//                    DropdownSettingItem(
+//                        label = "Провайдер",
+//                        selectedValue = settings.provider.displayName,
+//                        options = AiProvider.entries.map { it.displayName },
+//                        onOptionSelected = { displayName ->
+//                            val provider = AiProvider.entries.first { it.displayName == displayName }
+//                            val newModel = AiModel.defaultForProvider(provider)
+//                            onSettingsChange(settings.copy(provider = provider, model = newModel))
+//                        }
+//                    )
+//
+//                    val availableModels = AiModel.forProvider(settings.provider)
+//                    DropdownSettingItem(
+//                        label = "Модель",
+//                        selectedValue = settings.model.displayName,
+//                        options = availableModels.map { it.displayName },
+//                        onOptionSelected = { displayName ->
+//                            val model = availableModels.first { it.displayName == displayName }
+//                            onSettingsChange(settings.copy(model = model))
+//                        }
+//                    )
 
                     DropdownSettingItem(
                         label = "Стиль общения",
@@ -110,15 +117,72 @@ fun SettingsDialog(
                         }
                     )
 
+                    if (settings.systemPromptMode != SystemPromptMode.CUSTOM) {
+                        DropdownSettingItem(
+                            label = "Формат ответа",
+                            selectedValue = settings.responseFormat.displayName,
+                            options = ResponseFormat.entries.map { it.displayName },
+                            onOptionSelected = { displayName ->
+                                val format = ResponseFormat.entries.first { it.displayName == displayName }
+                                onSettingsChange(settings.copy(responseFormat = format))
+                            }
+                        )
+                    }
+
                     DropdownSettingItem(
-                        label = "Формат ответа",
-                        selectedValue = settings.responseFormat.displayName,
-                        options = ResponseFormat.entries.map { it.displayName },
+                        label = "Системный промпт",
+                        selectedValue = settings.systemPromptMode.displayName,
+                        options = SystemPromptMode.entries.map { it.displayName },
                         onOptionSelected = { displayName ->
-                            val format = ResponseFormat.entries.first { it.displayName == displayName }
-                            onSettingsChange(settings.copy(responseFormat = format))
+                            val mode = SystemPromptMode.entries.first { it.displayName == displayName }
+                            if (mode == SystemPromptMode.CUSTOM) {
+                                onSettingsChange(settings.copy(
+                                    systemPromptMode = mode,
+                                    responseFormat = ResponseFormat.TEXT
+                                ))
+                            } else {
+                                onSettingsChange(settings.copy(systemPromptMode = mode))
+                            }
                         }
                     )
+
+                    if (settings.systemPromptMode == SystemPromptMode.CUSTOM) {
+                        var localPrompt by remember(settings.customSystemPrompt) {
+                            mutableStateOf(settings.customSystemPrompt)
+                        }
+
+                        Column {
+                            Text(
+                                text = "Текст промпта",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            OutlinedTextField(
+                                value = localPrompt,
+                                onValueChange = { localPrompt = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Введите системный промпт...") },
+                                minLines = 3,
+                                maxLines = 6
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = {
+                                    keyboardController?.hide()
+                                    onSettingsChange(settings.copy(customSystemPrompt = localPrompt))
+                                },
+                                enabled = localPrompt != settings.customSystemPrompt,
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text("Сохранить")
+                            }
+                        }
+                    }
 
                     SwitchSettingItem(
                         label = "Отправка по Shift+Enter",

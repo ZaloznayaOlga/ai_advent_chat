@@ -41,10 +41,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override fun sendMessage(messages: List<Message>, settings: ChatSettings): Flow<Result<Message>> = flow {
         try {
-            val systemPrompt = systemPromptProvider.getSystemPrompt(
-                settings.communicationStyle,
-                settings.responseFormat
-            )
+            val systemPrompt = systemPromptProvider.getSystemPrompt(settings)
 
             val systemMessage = MessageDto(
                 role = "system",

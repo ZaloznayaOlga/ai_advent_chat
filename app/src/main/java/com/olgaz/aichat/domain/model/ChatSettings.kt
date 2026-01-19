@@ -58,6 +58,14 @@ enum class SendMessageMode(val displayName: String) {
 }
 
 /**
+ * Режим системного промпта
+ */
+enum class SystemPromptMode(val displayName: String) {
+    DEFAULT("По умолчанию"),
+    CUSTOM("Пользовательский")
+}
+
+/**
  * Настройки чата для текущей сессии
  */
 data class ChatSettings(
@@ -66,5 +74,7 @@ data class ChatSettings(
     val communicationStyle: CommunicationStyle = CommunicationStyle.GENERAL,
     val deepThinking: Boolean = false,
     val responseFormat: ResponseFormat = ResponseFormat.TEXT,
-    val sendMessageMode: SendMessageMode = SendMessageMode.ENTER
+    val sendMessageMode: SendMessageMode = SendMessageMode.ENTER,
+    val systemPromptMode: SystemPromptMode = SystemPromptMode.DEFAULT,
+    val customSystemPrompt: String = ""
 )
