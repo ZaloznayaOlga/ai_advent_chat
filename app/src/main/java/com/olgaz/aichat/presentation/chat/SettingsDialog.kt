@@ -20,8 +20,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +57,8 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
+    var localSettings by remember { mutableStateOf(settings) }
+    val defaultSettings = ChatSettings()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -70,87 +76,72 @@ fun SettingsDialog(
 
                 Column(
                     modifier = Modifier
+                        .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-//                    DropdownSettingItem(
-//                        label = "Провайдер",
-//                        selectedValue = settings.provider.displayName,
-//                        options = AiProvider.entries.map { it.displayName },
-//                        onOptionSelected = { displayName ->
-//                            val provider = AiProvider.entries.first { it.displayName == displayName }
-//                            val newModel = AiModel.defaultForProvider(provider)
-//                            onSettingsChange(settings.copy(provider = provider, model = newModel))
-//                        }
-//                    )
-//
-//                    val availableModels = AiModel.forProvider(settings.provider)
-//                    DropdownSettingItem(
-//                        label = "Модель",
-//                        selectedValue = settings.model.displayName,
-//                        options = availableModels.map { it.displayName },
-//                        onOptionSelected = { displayName ->
-//                            val model = availableModels.first { it.displayName == displayName }
-//                            onSettingsChange(settings.copy(model = model))
-//                        }
-//                    )
-
                     DropdownSettingItem(
                         label = "Стиль общения",
-                        selectedValue = settings.communicationStyle.displayName,
+                        selectedValue = localSettings.communicationStyle.displayName,
                         options = CommunicationStyle.entries.map { it.displayName },
                         onOptionSelected = { displayName ->
                             val style = CommunicationStyle.entries.first { it.displayName == displayName }
-                            onSettingsChange(settings.copy(communicationStyle = style))
+                            localSettings = localSettings.copy(communicationStyle = style)
                         }
                     )
 
                     SwitchSettingItem(
                         label = "Глубокое мышление",
-                        description = when (settings.provider) {
+                        description = when (localSettings.provider) {
                             AiProvider.DEEPSEEK -> "Использует deepseek-reasoner"
                             AiProvider.OPENAI -> "Использует o1-preview"
                         },
-                        checked = settings.deepThinking,
+                        checked = localSettings.deepThinking,
                         onCheckedChange = { enabled ->
-                            onSettingsChange(settings.copy(deepThinking = enabled))
+                            localSettings = localSettings.copy(deepThinking = enabled)
                         }
                     )
 
-                    if (settings.systemPromptMode != SystemPromptMode.CUSTOM) {
+                    SliderSettingItem(
+                        label = "Температура",
+                        value = localSettings.temperature,
+                        onValueChange = { newTemp ->
+                            localSettings = localSettings.copy(temperature = newTemp)
+                        },
+                        valueRange = 0f..1.5f,
+                        steps = 14
+                    )
+
+                    if (localSettings.systemPromptMode != SystemPromptMode.CUSTOM) {
                         DropdownSettingItem(
                             label = "Формат ответа",
-                            selectedValue = settings.responseFormat.displayName,
+                            selectedValue = localSettings.responseFormat.displayName,
                             options = ResponseFormat.entries.map { it.displayName },
                             onOptionSelected = { displayName ->
                                 val format = ResponseFormat.entries.first { it.displayName == displayName }
-                                onSettingsChange(settings.copy(responseFormat = format))
+                                localSettings = localSettings.copy(responseFormat = format)
                             }
                         )
                     }
 
                     DropdownSettingItem(
                         label = "Системный промпт",
-                        selectedValue = settings.systemPromptMode.displayName,
+                        selectedValue = localSettings.systemPromptMode.displayName,
                         options = SystemPromptMode.entries.map { it.displayName },
                         onOptionSelected = { displayName ->
                             val mode = SystemPromptMode.entries.first { it.displayName == displayName }
                             if (mode == SystemPromptMode.CUSTOM) {
-                                onSettingsChange(settings.copy(
+                                localSettings = localSettings.copy(
                                     systemPromptMode = mode,
                                     responseFormat = ResponseFormat.TEXT
-                                ))
+                                )
                             } else {
-                                onSettingsChange(settings.copy(systemPromptMode = mode))
+                                localSettings = localSettings.copy(systemPromptMode = mode)
                             }
                         }
                     )
 
-                    if (settings.systemPromptMode == SystemPromptMode.CUSTOM) {
-                        var localPrompt by remember(settings.customSystemPrompt) {
-                            mutableStateOf(settings.customSystemPrompt)
-                        }
-
+                    if (localSettings.systemPromptMode == SystemPromptMode.CUSTOM) {
                         Column {
                             Text(
                                 text = "Текст промпта",
@@ -161,38 +152,54 @@ fun SettingsDialog(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             OutlinedTextField(
-                                value = localPrompt,
-                                onValueChange = { localPrompt = it },
+                                value = localSettings.customSystemPrompt,
+                                onValueChange = { newPrompt ->
+                                    localSettings = localSettings.copy(customSystemPrompt = newPrompt)
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("Введите системный промпт...") },
                                 minLines = 3,
                                 maxLines = 6
                             )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Button(
-                                onClick = {
-                                    keyboardController?.hide()
-                                    onSettingsChange(settings.copy(customSystemPrompt = localPrompt))
-                                },
-                                enabled = localPrompt != settings.customSystemPrompt,
-                                modifier = Modifier.align(Alignment.End)
-                            ) {
-                                Text("Сохранить")
-                            }
                         }
                     }
 
                     SwitchSettingItem(
                         label = "Отправка по Shift+Enter",
                         description = "Если выключено - Enter отправляет сообщение",
-                        checked = settings.sendMessageMode == SendMessageMode.SHIFT_ENTER,
+                        checked = localSettings.sendMessageMode == SendMessageMode.SHIFT_ENTER,
                         onCheckedChange = { isShiftEnter ->
                             val mode = if (isShiftEnter) SendMessageMode.SHIFT_ENTER else SendMessageMode.ENTER
-                            onSettingsChange(settings.copy(sendMessageMode = mode))
+                            localSettings = localSettings.copy(sendMessageMode = mode)
                         }
                     )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { localSettings = defaultSettings },
+                        enabled = localSettings != defaultSettings,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Сбросить")
+                    }
+
+                    Button(
+                        onClick = {
+                            keyboardController?.hide()
+                            onSettingsChange(localSettings)
+                            onDismiss()
+                        },
+                        enabled = localSettings != settings,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Сохранить")
+                    }
                 }
             }
         }
@@ -303,6 +310,48 @@ private fun SwitchSettingItem(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun SliderSettingItem(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = String.format("%.1f", value),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            modifier = Modifier.fillMaxWidth(),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = Color(0xFFB85450),
+                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                activeTickColor = Color.White,
+                inactiveTickColor = Color.White
+            )
         )
     }
 }

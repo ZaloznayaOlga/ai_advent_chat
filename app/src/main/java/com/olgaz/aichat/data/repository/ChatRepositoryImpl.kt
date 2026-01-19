@@ -63,7 +63,11 @@ class ChatRepositoryImpl @Inject constructor(
 
             val api = selectApi(settings.provider)
             val modelName = getModelName(settings)
-            val request = ChatRequestDto(model = modelName, messages = allMessages)
+            val request = ChatRequestDto(
+                model = modelName,
+                messages = allMessages,
+                temperature = settings.temperature
+            )
             Log.d(TAG, "modelName: $modelName Base url = ${settings.provider}")
             val response = api.sendMessage(request)
 

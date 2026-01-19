@@ -76,5 +76,6 @@ data class ChatSettings(
     val responseFormat: ResponseFormat = ResponseFormat.TEXT,
     val sendMessageMode: SendMessageMode = SendMessageMode.ENTER,
     val systemPromptMode: SystemPromptMode = SystemPromptMode.DEFAULT,
-    val customSystemPrompt: String = ""
+    val customSystemPrompt: String = "",
+    val temperature: Float = 1.0f
 )
