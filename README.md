@@ -1,33 +1,49 @@
 # AI Chat
 
-Android-приложение для общения с ИИ через чат, использующее DeepSeek API.
+Android-приложение для общения с ИИ через чат с поддержкой нескольких AI провайдеров (DeepSeek, OpenAI).
 
 ## Возможности
 
-- Чат с ИИ через DeepSeek API
-- **Структурированные ответы** — ИИ отвечает в формате JSON, который парсится и отображается в красивом виде
-- Отображение метаданных ответа: дата, время, тема, язык
-- Теги и ссылки в ответах
-- **Просмотр исходного JSON** с подсветкой синтаксиса
-- Копирование JSON в буфер обмена
+### Чат
+- Чат с ИИ через DeepSeek или OpenAI API
+- **Копирование сообщений** — долгое нажатие копирует текст в буфер обмена
+- **Очистка истории** — кнопка очистки чата в верхней панели
 - Информативные сообщения об ошибках на русском языке
+
+### Настройки AI
+- **Температура** — настройка креативности ответов (0.0 - 1.5)
+- **Стиль общения** — общие ответы или с уточняющими вопросами
+
+### Формат ответов
+- **Текст** — простой текстовый ответ
+- **JSON** — структурированный ответ с метаданными (дата, время, тема, теги, ссылки)
+- **XML** — структурированный ответ в XML формате
+- **Просмотр исходного кода** — с подсветкой синтаксиса
+- Копирование JSON/XML в буфер обмена
+
+### Системный промпт
+- **По умолчанию** — встроенные промпты для каждого формата
+- **Пользовательский** — возможность задать свой системный промпт
 
 ## Скриншот
 
 Приложение представляет собой экран чата с:
-- Заголовком "AI Chat" в верхней части
+- Заголовком "AI Chat" и кнопками настроек/очистки в верхней части
 - Областью сообщений с форматированными ответами
-- Секциями: Дата, Время, Язык, Тема, Вопрос, Ответ, Теги, Ссылки, JSON
+- При JSON формате: секции Дата, Время, Язык, Тема, Вопрос, Ответ, Теги, Ссылки
 - Полем ввода и кнопкой отправки внизу
 
-## Настройка API ключа
+## Настройка API ключей
 
-1. Получите API ключ на сайте [DeepSeek](https://platform.deepseek.com/)
-2. Откройте файл `local.properties` в корне проекта
-3. Добавьте или измените строку:
-   ```
-   DEEPSEEK_API_KEY=ваш_api_ключ_здесь
-   ```
+Добавьте необходимые API ключи в файл `local.properties` в корне проекта:
+
+```properties
+# DeepSeek API (https://platform.deepseek.com/)
+DEEPSEEK_API_KEY=ваш_deepseek_ключ
+
+# OpenAI API (https://platform.openai.com/) — опционально
+OPENAI_API_KEY=ваш_openai_ключ
+```
 
 **Важно:** Файл `local.properties` не должен попадать в систему контроля версий (уже добавлен в `.gitignore`).
 
@@ -58,7 +74,12 @@ Android-приложение для общения с ИИ через чат, и
 ```
 app/src/main/
 ├── assets/
-│   └── system-prompt.txt           # Системный промпт для JSON формата
+│   ├── system-prompt.txt              # Основной системный промпт
+│   ├── system-prompt-default.txt      # Промпт по умолчанию
+│   ├── system-prompt-text.txt         # Промпт для текстового формата
+│   ├── system-prompt-json.txt         # Промпт для JSON формата
+│   ├── system-prompt-xml.txt          # Промпт для XML формата
+│   └── system-prompt-with-questions.txt # Промпт с уточняющими вопросами
 │
 └── java/com/olgaz/aichat/
     ├── data/                           # Data Layer
@@ -66,17 +87,20 @@ app/src/main/
     │   │   └── SystemPromptProviderImpl.kt  # Загрузка промпта из assets
     │   ├── remote/
     │   │   ├── api/
-    │   │   │   └── DeepSeekApi.kt      # Retrofit API interface
-    │   │   └── dto/
-    │   │       ├── AiResponseJsonDto.kt # DTO для JSON ответа ИИ
-    │   │       ├── ChatRequestDto.kt   # Request DTO
-    │   │       └── ChatResponseDto.kt  # Response DTO
+    │   │   │   └── ChatApi.kt          # Унифицированный Retrofit API
+    │   │   ├── dto/
+    │   │   │   ├── AiResponseJsonDto.kt # DTO для JSON ответа ИИ
+    │   │   │   ├── ChatRequestDto.kt   # Request DTO с temperature
+    │   │   │   └── ChatResponseDto.kt  # Response DTO
+    │   │   └── logging/
+    │   │       └── PrettyJsonLogger.kt # Форматированный логгер JSON
     │   └── repository/
-    │       └── ChatRepositoryImpl.kt   # Repository + JSON parsing
+    │       └── ChatRepositoryImpl.kt   # Repository + JSON/XML parsing
     │
     ├── domain/                         # Domain Layer
     │   ├── model/
-    │   │   └── Message.kt              # Domain model + MessageJsonData
+    │   │   ├── Message.kt              # Domain model + MessageJsonData
+    │   │   └── ChatSettings.kt         # Настройки: провайдер, модель, температура
     │   ├── provider/
     │   │   └── SystemPromptProvider.kt # Интерфейс провайдера промпта
     │   ├── repository/
@@ -86,9 +110,10 @@ app/src/main/
     │
     ├── presentation/                   # Presentation Layer
     │   └── chat/
-    │       ├── ChatScreen.kt           # Compose UI + JSON viewer
-    │       ├── ChatViewModel.kt        # ViewModel
-    │       └── ChatUiState.kt          # UI State
+    │       ├── ChatScreen.kt           # Compose UI + copy on long press
+    │       ├── ChatViewModel.kt        # ViewModel + clear history
+    │       ├── ChatUiState.kt          # UI State
+    │       └── SettingsDialog.kt       # Диалог настроек чата
     │
     ├── di/                             # Dependency Injection
     │   ├── NetworkModule.kt            # Network dependencies
@@ -109,9 +134,14 @@ app/src/main/
 - **Domain Layer** — бизнес-логика, модели, интерфейсы репозиториев, use cases
 - **Presentation Layer** — UI (Jetpack Compose), ViewModel, UI State
 
-## Формат ответа ИИ
+## Форматы ответов ИИ
 
-ИИ настроен отвечать в структурированном JSON формате:
+Приложение поддерживает три формата ответов:
+
+### Текстовый формат
+Простой текстовый ответ без структурирования.
+
+### JSON формат
 
 ```json
 {
@@ -125,7 +155,26 @@ app/src/main/
 }
 ```
 
-### Отображение в UI
+### XML формат
+
+```xml
+<response>
+  <datetime>2026-01-13T22:42:00</datetime>
+  <topic>Тема вопроса</topic>
+  <question>Исходный вопрос пользователя</question>
+  <answer>Подробный ответ с форматированием</answer>
+  <tags>
+    <tag>tag1</tag>
+    <tag>tag2</tag>
+  </tags>
+  <links>
+    <link>https://example.com</link>
+  </links>
+  <language>ru</language>
+</response>
+```
+
+### Отображение структурированных ответов в UI
 
 Ответ парсится и отображается в виде секций с рамками:
 - **Дата** — форматированная дата (например, "13 января 2026")
@@ -136,12 +185,12 @@ app/src/main/
 - **Ответ** — основной текст ответа
 - **Теги** — релевантные теги в виде чипсов
 - **Ссылки** — кликабельные ссылки
-- **JSON** — кнопка для просмотра исходного JSON
+- **JSON/XML** — кнопка для просмотра исходного кода
 
-### Просмотр JSON
+### Просмотр исходного кода
 
-При нажатии на кнопку "Показать исходный JSON" открывается диалог с:
-- Подсветкой синтаксиса (ключи — голубые, значения — зелёные, скобки — белые)
+При нажатии на кнопку "Показать исходный JSON/XML" открывается диалог с:
+- Подсветкой синтаксиса
 - Прокруткой для длинных ответов
 - Кнопкой копирования в буфер обмена
 
@@ -182,12 +231,17 @@ app/src/main/
 | Compose BOM | 2024.09.00 |
 | Hilt | 2.51.1 |
 
-## API
+## Поддерживаемые AI провайдеры
 
-Приложение использует DeepSeek Chat API:
+### DeepSeek
 - **Base URL:** `https://api.deepseek.com/`
 - **Endpoint:** `POST /chat/completions`
-- **Model:** `deepseek-chat`
+- **Модели:** `deepseek-chat`, `deepseek-reasoner`
+
+### OpenAI
+- **Base URL:** `https://api.openai.com/v1/`
+- **Endpoint:** `POST /chat/completions`
+- **Модели:** `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`
 
 ## Автор
 
