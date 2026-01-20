@@ -3,6 +3,7 @@ package com.olgaz.aichat.di
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.olgaz.aichat.BuildConfig
 import com.olgaz.aichat.data.remote.api.ChatApi
+import com.olgaz.aichat.data.remote.logging.PrettyJsonLogger
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,7 +40,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideLoggingInterceptor(): HttpLoggingInterceptor = HttpLoggingInterceptor().apply {
+    fun provideLoggingInterceptor(): HttpLoggingInterceptor = HttpLoggingInterceptor(PrettyJsonLogger()).apply {
         level = if (BuildConfig.DEBUG) {
             HttpLoggingInterceptor.Level.BODY
         } else {
