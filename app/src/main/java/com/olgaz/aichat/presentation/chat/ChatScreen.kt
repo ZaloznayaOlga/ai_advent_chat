@@ -6,9 +6,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -245,6 +247,7 @@ private fun EmptyState() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageItem(message: Message) {
     val isUser = message.role == MessageRole.USER
@@ -252,34 +255,72 @@ private fun MessageItem(message: Message) {
     val formattedTime = remember(message.timestamp) {
         timeFormat.format(Date(message.timestamp))
     }
+    val clipboardManager = LocalClipboardManager.current
+    var showCopiedHint by remember { mutableStateOf(false) }
+
+    val textToCopy = if (message.jsonData != null) {
+        message.jsonData.answer
+    } else {
+        message.content
+    }
+
+    val onCopyText: () -> Unit = {
+        clipboardManager.setText(AnnotatedString(textToCopy))
+        showCopiedHint = true
+    }
+
+    LaunchedEffect(showCopiedHint) {
+        if (showCopiedHint) {
+            kotlinx.coroutines.delay(1500)
+            showCopiedHint = false
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         if (isUser) {
-            UserMessageCard(message.content)
+            UserMessageCard(content = message.content, onLongClick = onCopyText)
         } else {
             if (message.jsonData != null) {
-                AssistantStructuredMessage(jsonData = message.jsonData)
+                AssistantStructuredMessage(jsonData = message.jsonData, onLongClick = onCopyText)
             } else {
-                AssistantSimpleMessageCard(message.content)
+                AssistantSimpleMessageCard(content = message.content, onLongClick = onCopyText)
             }
         }
 
-        Text(
-            text = formattedTime,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-        )
+        ) {
+            Text(
+                text = formattedTime,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (showCopiedHint) {
+                Text(
+                    text = "Скопировано",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF388E3C)
+                )
+            }
+        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserMessageCard(content: String) {
+private fun UserMessageCard(content: String, onLongClick: () -> Unit) {
     Card(
-        modifier = Modifier.widthIn(max = 300.dp),
+        modifier = Modifier
+            .widthIn(max = 300.dp)
+            .combinedClickable(
+                onClick = { },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(
             topStart = 16.dp,
             topEnd = 16.dp,
@@ -297,10 +338,16 @@ private fun UserMessageCard(content: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantSimpleMessageCard(content: String) {
+private fun AssistantSimpleMessageCard(content: String, onLongClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = GreenAssistant)
     ) {
@@ -313,9 +360,9 @@ private fun AssistantSimpleMessageCard(content: String) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
+private fun AssistantStructuredMessage(jsonData: MessageJsonData, onLongClick: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val borderColor = Color.Gray.copy(alpha = 0.4f)
     var showJsonDialog by remember { mutableStateOf(false) }
@@ -329,7 +376,12 @@ private fun AssistantStructuredMessage(jsonData: MessageJsonData) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = GreenAssistant)
     ) {
