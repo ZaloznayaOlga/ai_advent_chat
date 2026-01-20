@@ -83,4 +83,8 @@ class ChatViewModel @Inject constructor(
     fun updateSettings(settings: ChatSettings) {
         _uiState.update { it.copy(settings = settings) }
     }
+
+    fun clearChatHistory() {
+        _uiState.update { it.copy(messages = emptyList()) }
+    }
 }

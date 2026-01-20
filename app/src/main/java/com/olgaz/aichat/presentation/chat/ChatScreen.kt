@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -158,6 +159,13 @@ fun ChatScreen(
                         )
                     },
                     actions = {
+                        IconButton(onClick = { viewModel.clearChatHistory() }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Очистить историю",
+                                tint = Color.White
+                            )
+                        }
                         IconButton(onClick = { viewModel.showSettingsDialog() }) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
