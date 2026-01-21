@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -81,6 +82,32 @@ fun SettingsDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     DropdownSettingItem(
+                        label = "Провайдер AI",
+                        selectedValue = localSettings.provider.displayName,
+                        options = AiProvider.entries.map { it.displayName },
+                        onOptionSelected = { displayName ->
+                            val provider = AiProvider.entries.first { it.displayName == displayName }
+                            val defaultModel = AiModel.defaultForProvider(provider)
+                            localSettings = localSettings.copy(
+                                provider = provider,
+                                model = defaultModel
+                            )
+                        }
+                    )
+
+                    DropdownSettingItem(
+                        label = "Модель",
+                        selectedValue = localSettings.model.displayName,
+                        options = AiModel.forProvider(localSettings.provider).map { it.displayName },
+                        onOptionSelected = { displayName ->
+                            val model = AiModel.entries.first {
+                                it.displayName == displayName && it.provider == localSettings.provider
+                            }
+                            localSettings = localSettings.copy(model = model)
+                        }
+                    )
+
+                    DropdownSettingItem(
                         label = "Стиль общения",
                         selectedValue = localSettings.communicationStyle.displayName,
                         options = CommunicationStyle.entries.map { it.displayName },
@@ -95,11 +122,13 @@ fun SettingsDialog(
                         description = when (localSettings.provider) {
                             AiProvider.DEEPSEEK -> "Использует deepseek-reasoner"
                             AiProvider.OPENAI -> "Использует o1-preview"
+                            AiProvider.HUGGINGFACE -> "Недоступно для HuggingFace"
                         },
                         checked = localSettings.deepThinking,
                         onCheckedChange = { enabled ->
                             localSettings = localSettings.copy(deepThinking = enabled)
-                        }
+                        },
+                        enabled = localSettings.provider != AiProvider.HUGGINGFACE
                     )
 
                     SliderSettingItem(
@@ -286,10 +315,13 @@ private fun SwitchSettingItem(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    description: String? = null
+    description: String? = null,
+    enabled: Boolean = true
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -309,7 +341,8 @@ private fun SwitchSettingItem(
 
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            enabled = enabled
         )
     }
 }

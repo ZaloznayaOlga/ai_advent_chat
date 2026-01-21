@@ -33,6 +33,8 @@ android {
         buildConfigField("String", "DEEPSEEK_BASE_URL", "\"https://api.deepseek.com/\"")
         buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties.getProperty("OPENAI_API_KEY", "")}\"")
         buildConfigField("String", "OPENAI_BASE_URL", "\"https://api.openai.com/v1/\"")
+        buildConfigField("String", "HUGGINGFACE_API_KEY", "\"${localProperties.getProperty("HUGGINGFACE_API_KEY", "")}\"")
+        buildConfigField("String", "HUGGINGFACE_BASE_URL", "\"https://router.huggingface.co/v1/\"")
     }
 
     buildTypes {

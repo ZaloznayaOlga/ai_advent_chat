@@ -26,6 +26,10 @@ annotation class DeepSeekApi
 @Retention(AnnotationRetention.BINARY)
 annotation class OpenAiApi
 
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class HuggingFaceApi
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -140,5 +144,52 @@ object NetworkModule {
     @Singleton
     @OpenAiApi
     fun provideOpenAiChatApi(@OpenAiApi retrofit: Retrofit): ChatApi =
+        retrofit.create(ChatApi::class.java)
+
+    // HuggingFace
+    @Provides
+    @Singleton
+    @HuggingFaceApi
+    fun provideHuggingFaceAuthInterceptor(): Interceptor = Interceptor { chain ->
+        val request = chain.request().newBuilder()
+            .addHeader("Authorization", "Bearer ${BuildConfig.HUGGINGFACE_API_KEY}")
+            .addHeader("Content-Type", "application/json")
+            .build()
+        chain.proceed(request)
+    }
+
+    @Provides
+    @Singleton
+    @HuggingFaceApi
+    fun provideHuggingFaceOkHttpClient(
+        @HuggingFaceApi authInterceptor: Interceptor,
+        loggingInterceptor: HttpLoggingInterceptor
+    ): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
+        .addInterceptor(loggingInterceptor)
+        .connectTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
+        .build()
+
+    @Provides
+    @Singleton
+    @HuggingFaceApi
+    fun provideHuggingFaceRetrofit(
+        @HuggingFaceApi okHttpClient: OkHttpClient,
+        json: Json
+    ): Retrofit {
+        val contentType = "application/json".toMediaType()
+        return Retrofit.Builder()
+            .baseUrl(BuildConfig.HUGGINGFACE_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @HuggingFaceApi
+    fun provideHuggingFaceChatApi(@HuggingFaceApi retrofit: Retrofit): ChatApi =
         retrofit.create(ChatApi::class.java)
 }

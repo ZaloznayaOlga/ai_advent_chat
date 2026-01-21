@@ -5,7 +5,8 @@ package com.olgaz.aichat.domain.model
  */
 enum class AiProvider(val displayName: String) {
     DEEPSEEK("DeepSeek"),
-    OPENAI("OpenAI")
+    OPENAI("OpenAI"),
+    HUGGINGFACE("HuggingFace")
 }
 
 /**
@@ -19,12 +20,16 @@ enum class AiModel(val displayName: String, val apiName: String, val provider: A
     GPT_4O("GPT-4o", "gpt-4o", AiProvider.OPENAI),
     GPT_4O_MINI("GPT-4o Mini", "gpt-4o-mini", AiProvider.OPENAI),
     O1_PREVIEW("o1-preview", "o1-preview", AiProvider.OPENAI),
-    O1_MINI("o1-mini", "o1-mini", AiProvider.OPENAI);
+    O1_MINI("o1-mini", "o1-mini", AiProvider.OPENAI),
+    // HuggingFace модели
+    QWEN_72B("Qwen 2.5 72B", "Qwen/Qwen2.5-72B-Instruct", AiProvider.HUGGINGFACE),
+    LLAMA_3B("Llama 3.2 3B", "meta-llama/Llama-3.2-3B-Instruct", AiProvider.HUGGINGFACE);
 
     companion object {
         fun defaultForProvider(provider: AiProvider): AiModel = when (provider) {
             AiProvider.DEEPSEEK -> DEEPSEEK_CHAT
             AiProvider.OPENAI -> GPT_4O
+            AiProvider.HUGGINGFACE -> QWEN_72B
         }
 
         fun forProvider(provider: AiProvider): List<AiModel> =

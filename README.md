@@ -5,7 +5,9 @@ Android-приложение для общения с ИИ через чат с 
 ## Возможности
 
 ### Чат
-- Чат с ИИ через DeepSeek или OpenAI API
+- Чат с ИИ через DeepSeek, OpenAI или HuggingFace API
+- **Метаданные ответа** — под каждым сообщением ИИ отображается: время ответа, токены (input/output), стоимость
+- **Расчёт стоимости** — автоматический расчёт для DeepSeek ($0.28/1M input, $0.42/1M output), остальные провайдеры — free
 - **Копирование сообщений** — долгое нажатие копирует текст в буфер обмена
 - **Очистка истории** — кнопка очистки чата в верхней панели
 - Информативные сообщения об ошибках на русском языке
@@ -43,6 +45,9 @@ DEEPSEEK_API_KEY=ваш_deepseek_ключ
 
 # OpenAI API (https://platform.openai.com/) — опционально
 OPENAI_API_KEY=ваш_openai_ключ
+
+# HuggingFace API (https://huggingface.co/settings/tokens) — опционально
+HUGGINGFACE_API_KEY=ваш_huggingface_ключ
 ```
 
 **Важно:** Файл `local.properties` не должен попадать в систему контроля версий (уже добавлен в `.gitignore`).
@@ -99,7 +104,7 @@ app/src/main/
     │
     ├── domain/                         # Domain Layer
     │   ├── model/
-    │   │   ├── Message.kt              # Domain model + MessageJsonData
+    │   │   ├── Message.kt              # Domain model + MessageJsonData + MessageMetadata
     │   │   └── ChatSettings.kt         # Настройки: провайдер, модель, температура
     │   ├── provider/
     │   │   └── SystemPromptProvider.kt # Интерфейс провайдера промпта
@@ -242,6 +247,11 @@ app/src/main/
 - **Base URL:** `https://api.openai.com/v1/`
 - **Endpoint:** `POST /chat/completions`
 - **Модели:** `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`
+
+### HuggingFace
+- **Base URL:** `https://router.huggingface.co/v1/`
+- **Endpoint:** `POST /chat/completions`
+- **Модели:** `Qwen/Qwen2.5-72B-Instruct`, `meta-llama/Llama-3.2-3B-Instruct`
 
 ## Автор
 

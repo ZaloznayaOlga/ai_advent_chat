@@ -86,8 +86,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
+import com.olgaz.aichat.domain.model.MessageMetadata
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
@@ -99,6 +101,7 @@ import com.olgaz.aichat.ui.theme.GreenAssistant
 import com.olgaz.aichat.ui.theme.GreenUser
 import com.olgaz.aichat.ui.theme.GreyDark
 import com.olgaz.aichat.ui.theme.GreyLight
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -316,7 +319,45 @@ private fun MessageItem(message: Message) {
                 )
             }
         }
+
+        // Metadata info for assistant messages
+        if (!isUser && message.metadata != null) {
+            MetadataInfo(metadata = message.metadata)
+        }
     }
+}
+
+@Composable
+private fun MetadataInfo(metadata: MessageMetadata) {
+    val timeFormatted = remember(metadata.responseTimeMs) {
+        if (metadata.responseTimeMs >= 1000) {
+            String.format(Locale.US, "%.1fс", metadata.responseTimeMs / 1000.0)
+        } else {
+            "${metadata.responseTimeMs}мс"
+        }
+    }
+
+    val costFormatted = remember(metadata) {
+        val cost = metadata.calculateCost()
+        if (cost > 0) {
+            val formatter = DecimalFormat("0.######")
+            "\$${formatter.format(cost)}"
+        } else {
+            "free"
+        }
+    }
+
+    val totalTokens = metadata.inputTokens + metadata.outputTokens
+    val infoText = remember(metadata, timeFormatted, costFormatted, totalTokens) {
+        "⏱$timeFormatted | $totalTokens tokens (⬇${metadata.inputTokens} ⬆${metadata.outputTokens}) | $costFormatted"
+    }
+
+    Text(
+        text = infoText,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        modifier = Modifier.padding(horizontal = 4.dp)
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

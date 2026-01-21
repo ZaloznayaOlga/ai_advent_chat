@@ -5,11 +5,13 @@ import com.olgaz.aichat.data.remote.dto.AiResponseJsonDto
 import com.olgaz.aichat.data.remote.dto.ChatRequestDto
 import com.olgaz.aichat.data.remote.dto.MessageDto
 import com.olgaz.aichat.di.DeepSeekApi
+import com.olgaz.aichat.di.HuggingFaceApi
 import com.olgaz.aichat.di.OpenAiApi
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
+import com.olgaz.aichat.domain.model.MessageMetadata
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
@@ -28,6 +30,7 @@ private const val TAG = "ChatRepository"
 class ChatRepositoryImpl @Inject constructor(
     @DeepSeekApi private val deepSeekApi: ChatApi,
     @OpenAiApi private val openAiApi: ChatApi,
+    @HuggingFaceApi private val huggingFaceApi: ChatApi,
     private val systemPromptProvider: SystemPromptProvider
 ) : ChatRepository {
 
@@ -69,7 +72,10 @@ class ChatRepositoryImpl @Inject constructor(
                 temperature = settings.temperature
             )
             Log.d(TAG, "modelName: $modelName Base url = ${settings.provider}")
+
+            val startTime = System.currentTimeMillis()
             val response = api.sendMessage(request)
+            val responseTimeMs = System.currentTimeMillis() - startTime
 
             val rawContent = response.choices.firstOrNull()?.message?.content
 
@@ -78,13 +84,21 @@ class ChatRepositoryImpl @Inject constructor(
                 return@flow
             }
 
+            val metadata = MessageMetadata(
+                responseTimeMs = responseTimeMs,
+                inputTokens = response.usage?.promptTokens ?: 0,
+                outputTokens = response.usage?.completionTokens ?: 0,
+                provider = settings.provider
+            )
+
             val assistantMessage = when (settings.responseFormat) {
-                ResponseFormat.JSON -> parseJsonResponse(rawContent)
-                ResponseFormat.XML -> parseXmlResponse(rawContent)
+                ResponseFormat.JSON -> parseJsonResponse(rawContent, metadata)
+                ResponseFormat.XML -> parseXmlResponse(rawContent, metadata)
                 ResponseFormat.TEXT -> Message(
                     content = rawContent,
                     role = MessageRole.ASSISTANT,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    metadata = metadata
                 )
             }
 
@@ -111,6 +125,7 @@ class ChatRepositoryImpl @Inject constructor(
     private fun selectApi(provider: AiProvider): ChatApi = when (provider) {
         AiProvider.DEEPSEEK -> deepSeekApi
         AiProvider.OPENAI -> openAiApi
+        AiProvider.HUGGINGFACE -> huggingFaceApi
     }
 
     private fun getModelName(settings: ChatSettings): String {
@@ -118,13 +133,14 @@ class ChatRepositoryImpl @Inject constructor(
             when (settings.provider) {
                 AiProvider.DEEPSEEK -> "deepseek-reasoner"
                 AiProvider.OPENAI -> "o1-preview"
+                AiProvider.HUGGINGFACE -> settings.model.apiName // HuggingFace не имеет reasoning модели
             }
         } else {
             settings.model.apiName
         }
     }
 
-    private fun parseJsonResponse(rawContent: String): Message {
+    private fun parseJsonResponse(rawContent: String, metadata: MessageMetadata): Message {
         return try {
             val cleanedJson = cleanJsonResponse(rawContent)
             val aiResponse = json.decodeFromString<AiResponseJsonDto>(cleanedJson)
@@ -143,7 +159,8 @@ class ChatRepositoryImpl @Inject constructor(
                     language = aiResponse.language,
                     rawJson = cleanedJson,
                     responseFormat = ResponseFormat.JSON
-                )
+                ),
+                metadata = metadata
             )
         } catch (e: Exception) {
             Log.w(TAG, "JSON parsing failed, showing raw content", e)
@@ -151,12 +168,13 @@ class ChatRepositoryImpl @Inject constructor(
             Message(
                 content = rawContent,
                 role = MessageRole.ASSISTANT,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                metadata = metadata
             )
         }
     }
 
-    private fun parseXmlResponse(rawContent: String): Message {
+    private fun parseXmlResponse(rawContent: String, metadata: MessageMetadata): Message {
         return try {
             val cleanedXml = cleanXmlResponse(rawContent)
             val answer = extractXmlTag(cleanedXml, "answer") ?: rawContent
@@ -181,7 +199,8 @@ class ChatRepositoryImpl @Inject constructor(
                     language = language,
                     rawJson = cleanedXml,
                     responseFormat = ResponseFormat.XML
-                )
+                ),
+                metadata = metadata
             )
         } catch (e: Exception) {
             Log.w(TAG, "XML parsing failed, showing raw content", e)
@@ -189,7 +208,8 @@ class ChatRepositoryImpl @Inject constructor(
             Message(
                 content = rawContent,
                 role = MessageRole.ASSISTANT,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                metadata = metadata
             )
         }
     }
