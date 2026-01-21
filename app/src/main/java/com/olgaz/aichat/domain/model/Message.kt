@@ -1,5 +1,6 @@
 package com.olgaz.aichat.domain.model
 
+import java.util.Locale
 import java.util.UUID
 
 data class Message(
@@ -18,7 +19,8 @@ data class MessageMetadata(
     val responseTimeMs: Long,
     val inputTokens: Int,
     val outputTokens: Int,
-    val provider: AiProvider
+    val provider: AiProvider,
+    val model: AiModel? = null
 ) {
     /**
      * Calculate cost in USD.
@@ -57,4 +59,41 @@ enum class MessageRole {
     USER,
     ASSISTANT,
     SYSTEM
+}
+
+/**
+ * Token usage statistics for the entire conversation.
+ */
+data class ConversationTokens(
+    val totalInputTokens: Int,
+    val totalOutputTokens: Int
+) {
+    val totalTokens: Int get() = totalInputTokens + totalOutputTokens
+
+    /**
+     * Format token count: 1500 -> "1.5K", 150 -> "150"
+     */
+    fun formatTotal(): String = formatTokenCount(totalTokens)
+
+    companion object {
+        fun fromMessages(messages: List<Message>): ConversationTokens {
+            var inputTokens = 0
+            var outputTokens = 0
+            messages.forEach { message ->
+                message.metadata?.let {
+                    inputTokens += it.inputTokens
+                    outputTokens += it.outputTokens
+                }
+            }
+            return ConversationTokens(inputTokens, outputTokens)
+        }
+
+        private fun formatTokenCount(count: Int): String {
+            return when {
+                count >= 1_000_000 -> String.format(Locale.US, "%.1fM", count / 1_000_000.0)
+                count >= 1_000 -> String.format(Locale.US, "%.1fK", count / 1_000.0)
+                else -> count.toString()
+            }
+        }
+    }
 }

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -87,6 +88,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.olgaz.aichat.domain.model.AiProvider
+import com.olgaz.aichat.domain.model.ConversationTokens
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
 import com.olgaz.aichat.domain.model.MessageMetadata
@@ -162,11 +164,26 @@ fun ChatScreen(
                         )
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.clearChatHistory() }) {
+                        val conversationTokens = remember(uiState.messages) {
+                            ConversationTokens.fromMessages(uiState.messages)
+                        }
+                        if (conversationTokens.totalTokens > 0) {
+                            Text(
+                                text = "${conversationTokens.formatTotal()} tokens",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                        }
+                        val hasMessages = uiState.messages.isNotEmpty()
+                        IconButton(
+                            onClick = { viewModel.clearChatHistory() },
+                            enabled = hasMessages
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Delete,
+                                imageVector = if (hasMessages) Icons.Filled.Delete else Icons.Outlined.Delete,
                                 contentDescription = "Очистить историю",
-                                tint = Color.White
+                                tint = if (hasMessages) Color.White else Color.White.copy(alpha = 0.4f)
                             )
                         }
                         IconButton(onClick = { viewModel.showSettingsDialog() }) {
@@ -348,16 +365,47 @@ private fun MetadataInfo(metadata: MessageMetadata) {
     }
 
     val totalTokens = metadata.inputTokens + metadata.outputTokens
-    val infoText = remember(metadata, timeFormatted, costFormatted, totalTokens) {
-        "⏱$timeFormatted | $totalTokens tokens (⬇${metadata.inputTokens} ⬆${metadata.outputTokens}) | $costFormatted"
+
+    val usagePercentValue = remember(metadata, totalTokens) {
+        metadata.model?.maxTokens?.let { maxTokens ->
+            totalTokens.toDouble() / maxTokens * 100
+        }
     }
 
-    Text(
-        text = infoText,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        modifier = Modifier.padding(horizontal = 4.dp)
-    )
+    val usagePercentText = remember(usagePercentValue) {
+        usagePercentValue?.let { String.format(Locale.US, "%.1f%%", it) }
+    }
+
+    val usagePercentColor = remember(usagePercentValue) {
+        when {
+            usagePercentValue == null -> null
+            usagePercentValue <= 70.0 -> Color(0xFF4CAF50) // Green
+            usagePercentValue <= 90.0 -> Color(0xFFFF9800) // Orange
+            else -> Color(0xFFF44336) // Red
+        }
+    }
+
+    val baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+    Row(modifier = Modifier.padding(horizontal = 4.dp)) {
+        Text(
+            text = "⏱$timeFormatted | $totalTokens tokens",
+            style = MaterialTheme.typography.labelSmall,
+            color = baseColor
+        )
+        if (usagePercentText != null && usagePercentColor != null) {
+            Text(
+                text = " ($usagePercentText)",
+                style = MaterialTheme.typography.labelSmall,
+                color = usagePercentColor
+            )
+        }
+        Text(
+            text = " (⬇${metadata.inputTokens} ⬆${metadata.outputTokens}) | $costFormatted",
+            style = MaterialTheme.typography.labelSmall,
+            color = baseColor
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -952,66 +1000,98 @@ private fun MessageInput(
     gradientBrush: Brush,
     sendMessageMode: SendMessageMode
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(gradientBrush)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onTextChange,
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
-                        when (sendMessageMode) {
-                            SendMessageMode.ENTER -> {
-                                if (keyEvent.isShiftPressed) {
-                                    false
-                                } else {
-                                    if (text.isNotBlank() && !isLoading) {
-                                        onSendClick()
-                                    }
-                                    true
-                                }
-                            }
-                            SendMessageMode.SHIFT_ENTER -> {
-                                if (keyEvent.isShiftPressed) {
-                                    if (text.isNotBlank() && !isLoading) {
-                                        onSendClick()
-                                    }
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                        }
-                    } else {
-                        false
-                    }
-                },
-            placeholder = { Text("Введите сообщение...") },
-            shape = RoundedCornerShape(24.dp),
-            maxLines = 4,
-            enabled = !isLoading,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
-        )
-
-        IconButton(
-            onClick = onSendClick,
-            enabled = text.isNotBlank() && !isLoading
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Отправить",
-                tint = if (text.isNotBlank() && !isLoading)
-                    Color.White
-                else
-                    Color.White.copy(alpha = 0.38f)
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
+                            when (sendMessageMode) {
+                                SendMessageMode.ENTER -> {
+                                    if (keyEvent.isShiftPressed) {
+                                        false
+                                    } else {
+                                        if (text.isNotBlank() && !isLoading) {
+                                            onSendClick()
+                                        }
+                                        true
+                                    }
+                                }
+                                SendMessageMode.SHIFT_ENTER -> {
+                                    if (keyEvent.isShiftPressed) {
+                                        if (text.isNotBlank() && !isLoading) {
+                                            onSendClick()
+                                        }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                            }
+                        } else {
+                            false
+                        }
+                    },
+                placeholder = { Text("Введите сообщение...") },
+                shape = RoundedCornerShape(24.dp),
+                maxLines = 4,
+                enabled = !isLoading,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
+            )
+
+            IconButton(
+                onClick = onSendClick,
+                enabled = text.isNotBlank() && !isLoading
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Отправить",
+                    tint = if (text.isNotBlank() && !isLoading)
+                        Color.White
+                    else
+                        Color.White.copy(alpha = 0.38f)
+                )
+            }
+        }
+
+        if (text.isNotEmpty()) {
+            val charCount = text.length
+            val estimatedTokens = estimateTokenCount(text)
+            Text(
+                text = "$charCount chars · ~$estimatedTokens tokens",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
             )
         }
     }
+}
+
+/**
+ * Estimate token count for input text.
+ * Uses ~4 characters per token for Latin text, ~2 for Cyrillic/CJK.
+ */
+private fun estimateTokenCount(text: String): Int {
+    if (text.isEmpty()) return 0
+    var latinChars = 0
+    var otherChars = 0
+    text.forEach { char ->
+        if (char.code < 128) latinChars++ else otherChars++
+    }
+    val latinTokens = latinChars / 4.0
+    val otherTokens = otherChars / 2.0
+    return maxOf(1, (latinTokens + otherTokens).toInt())
 }

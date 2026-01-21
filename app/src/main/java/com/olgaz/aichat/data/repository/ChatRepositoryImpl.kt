@@ -7,6 +7,7 @@ import com.olgaz.aichat.data.remote.dto.MessageDto
 import com.olgaz.aichat.di.DeepSeekApi
 import com.olgaz.aichat.di.HuggingFaceApi
 import com.olgaz.aichat.di.OpenAiApi
+import com.olgaz.aichat.domain.model.AiModel
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.Message
@@ -71,7 +72,6 @@ class ChatRepositoryImpl @Inject constructor(
                 messages = allMessages,
                 temperature = settings.temperature
             )
-            Log.d(TAG, "modelName: $modelName Base url = ${settings.provider}")
 
             val startTime = System.currentTimeMillis()
             val response = api.sendMessage(request)
@@ -84,11 +84,13 @@ class ChatRepositoryImpl @Inject constructor(
                 return@flow
             }
 
+            val actualModel = getActualModel(settings)
             val metadata = MessageMetadata(
                 responseTimeMs = responseTimeMs,
                 inputTokens = response.usage?.promptTokens ?: 0,
                 outputTokens = response.usage?.completionTokens ?: 0,
-                provider = settings.provider
+                provider = settings.provider,
+                model = actualModel
             )
 
             val assistantMessage = when (settings.responseFormat) {
@@ -129,14 +131,18 @@ class ChatRepositoryImpl @Inject constructor(
     }
 
     private fun getModelName(settings: ChatSettings): String {
+        return getActualModel(settings).apiName
+    }
+
+    private fun getActualModel(settings: ChatSettings): AiModel {
         return if (settings.deepThinking) {
             when (settings.provider) {
-                AiProvider.DEEPSEEK -> "deepseek-reasoner"
-                AiProvider.OPENAI -> "o1-preview"
-                AiProvider.HUGGINGFACE -> settings.model.apiName // HuggingFace не имеет reasoning модели
+                AiProvider.DEEPSEEK -> AiModel.DEEPSEEK_REASONER
+                AiProvider.OPENAI -> AiModel.O1_PREVIEW
+                AiProvider.HUGGINGFACE -> settings.model // HuggingFace не имеет reasoning модели
             }
         } else {
-            settings.model.apiName
+            settings.model
         }
     }
 
