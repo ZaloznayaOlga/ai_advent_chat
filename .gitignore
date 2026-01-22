@@ -45,3 +45,8 @@ Thumbs.db
 CLAUDE.md
 .claude/
 tmpclaude-*
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+nul
