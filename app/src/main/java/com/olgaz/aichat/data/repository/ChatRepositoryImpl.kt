@@ -150,7 +150,7 @@ class ChatRepositoryImpl @Inject constructor(
         return if (settings.deepThinking) {
             when (settings.provider) {
                 AiProvider.DEEPSEEK -> AiModel.DEEPSEEK_REASONER
-                AiProvider.OPENAI -> AiModel.O1_PREVIEW
+                AiProvider.OPENAI -> AiModel.GPT_4O_MINI
                 AiProvider.HUGGINGFACE -> settings.model // HuggingFace не имеет reasoning модели
             }
         } else {

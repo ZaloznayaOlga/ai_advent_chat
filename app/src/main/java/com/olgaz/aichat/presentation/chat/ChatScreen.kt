@@ -94,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.olgaz.aichat.domain.model.AiModel
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.FileAttachment
 import com.olgaz.aichat.domain.model.ConversationTokens
@@ -173,7 +174,7 @@ fun ChatScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = "AI Chat",
+                            text = uiState.settings.model.displayName,
                             style = MaterialTheme.typography.titleLarge
                         )
                     },
@@ -182,10 +183,14 @@ fun ChatScreen(
                             ConversationTokens.fromMessages(uiState.messages)
                         }
                         if (conversationTokens.totalTokens > 0) {
+                            val tokensColor = getTokensIndicatorColor(
+                                totalTokens = conversationTokens.totalTokens,
+                                model = uiState.settings.model
+                            )
                             Text(
                                 text = "${conversationTokens.formatTotal()} tokens",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = tokensColor,
                                 modifier = Modifier.padding(end = 4.dp)
                             )
                         }
@@ -1241,4 +1246,21 @@ private fun estimateTokenCount(text: String): Int {
     val latinTokens = latinChars / 4.0
     val otherTokens = otherChars / 2.0
     return maxOf(1, (latinTokens + otherTokens).toInt())
+}
+
+/**
+ * Get color indicator for tokens based on model limit.
+ * - Green: 0-70% of limit
+ * - Orange: 71-90% of limit
+ * - Red: >90% of limit
+ * - White (default): no limit defined for model
+ */
+private fun getTokensIndicatorColor(totalTokens: Int, model: AiModel): Color {
+    val maxTokens = model.maxTokens ?: return Color.White.copy(alpha = 0.8f)
+    val percentage = (totalTokens.toFloat() / maxTokens) * 100
+    return when {
+        percentage <= 70f -> Color(0xFF4CAF50) // Green
+        percentage <= 90f -> Color(0xFFFF9800) // Orange
+        else -> Color(0xFFF44336) // Red
+    }
 }
