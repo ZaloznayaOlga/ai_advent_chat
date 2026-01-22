@@ -24,9 +24,9 @@ data class ChoiceDto(
 @Serializable
 data class UsageDto(
     @SerialName("prompt_tokens")
-    val promptTokens: Int,
+    val promptTokens: Int, // ваш запрос
     @SerialName("completion_tokens")
-    val completionTokens: Int,
+    val completionTokens: Int, // ответ ИИ
     @SerialName("total_tokens")
-    val totalTokens: Int
+    val totalTokens: Int // всего использовано
 )

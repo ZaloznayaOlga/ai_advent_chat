@@ -106,13 +106,25 @@ class ChatRepositoryImpl @Inject constructor(
 
             emit(Result.success(assistantMessage))
         } catch (e: HttpException) {
-            val errorMessage = when (e.code()) {
+            val errorBody = try {
+                e.response()?.errorBody()?.string()
+            } catch (_: Exception) {
+                null
+            }
+
+            val baseMessage = when (e.code()) {
                 400 -> "Неверный формат запроса."
                 401 -> "Ошибка доступа к API. Проверьте корректность API ключа!"
                 403 -> "Доступ запрещён. Проверьте права доступа API ключа."
                 429 -> "Слишком много запросов. Подождите немного и попробуйте снова."
                 500, 502, 503 -> "Сервер временно недоступен. Попробуйте позже."
                 else -> "Ошибка сервера: ${e.code()}"
+            }
+
+            val errorMessage = if (!errorBody.isNullOrBlank()) {
+                "$baseMessage\n\nОтвет сервера: $errorBody"
+            } else {
+                baseMessage
             }
             emit(Result.failure(ApiException(errorMessage)))
         } catch (e: UnknownHostException) {
