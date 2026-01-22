@@ -9,5 +9,13 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val settings: ChatSettings = ChatSettings(),
-    val isSettingsDialogVisible: Boolean = false
+    val isSettingsDialogVisible: Boolean = false,
+    val attachedFile: AttachedFileInfo? = null,
+    val isReadingFile: Boolean = false
+)
+
+data class AttachedFileInfo(
+    val fileName: String,
+    val content: String,
+    val characterCount: Int
 )

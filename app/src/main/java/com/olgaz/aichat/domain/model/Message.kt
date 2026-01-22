@@ -9,7 +9,18 @@ data class Message(
     val role: MessageRole,
     val timestamp: Long = System.currentTimeMillis(),
     val jsonData: MessageJsonData? = null,
-    val metadata: MessageMetadata? = null
+    val metadata: MessageMetadata? = null,
+    val attachedFile: FileAttachment? = null,
+    val displayContent: String = content
+)
+
+/**
+ * Information about an attached file in a user message.
+ * Used for display purposes - shows file chip instead of content.
+ */
+data class FileAttachment(
+    val fileName: String,
+    val characterCount: Int
 )
 
 /**

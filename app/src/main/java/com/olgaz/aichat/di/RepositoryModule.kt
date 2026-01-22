@@ -1,7 +1,9 @@
 package com.olgaz.aichat.di
 
+import com.olgaz.aichat.data.provider.FileContentReaderImpl
 import com.olgaz.aichat.data.provider.SystemPromptProviderImpl
 import com.olgaz.aichat.data.repository.ChatRepositoryImpl
+import com.olgaz.aichat.domain.provider.FileContentReader
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import com.olgaz.aichat.domain.repository.ChatRepository
 import dagger.Binds
@@ -25,4 +27,10 @@ abstract class RepositoryModule {
     abstract fun bindSystemPromptProvider(
         systemPromptProviderImpl: SystemPromptProviderImpl
     ): SystemPromptProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindFileContentReader(
+        fileContentReaderImpl: FileContentReaderImpl
+    ): FileContentReader
 }

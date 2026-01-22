@@ -33,11 +33,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -86,8 +91,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.olgaz.aichat.domain.model.AiProvider
+import com.olgaz.aichat.domain.model.FileAttachment
 import com.olgaz.aichat.domain.model.ConversationTokens
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
@@ -117,6 +125,12 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val isDarkTheme = isSystemInDarkTheme()
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.onFileSelected(it) }
+    }
 
     val gradientBrush = Brush.verticalGradient(
         colors = if (isDarkTheme) {
@@ -252,7 +266,11 @@ fun ChatScreen(
                 text = uiState.inputText,
                 onTextChange = viewModel::onInputTextChanged,
                 onSendClick = viewModel::sendMessage,
+                onAttachFileClick = { filePickerLauncher.launch(arrayOf("text/plain")) },
                 isLoading = uiState.isLoading,
+                isReadingFile = uiState.isReadingFile,
+                attachedFile = uiState.attachedFile,
+                onClearAttachment = viewModel::clearAttachedFile,
                 gradientBrush = gradientBrush,
                 sendMessageMode = uiState.settings.sendMessageMode
             )
@@ -309,7 +327,11 @@ private fun MessageItem(message: Message) {
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
         if (isUser) {
-            UserMessageCard(content = message.content, onLongClick = onCopyText)
+            UserMessageCard(
+                content = message.displayContent,
+                attachedFile = message.attachedFile,
+                onLongClick = onCopyText
+            )
         } else {
             if (message.jsonData != null) {
                 AssistantStructuredMessage(jsonData = message.jsonData, onLongClick = onCopyText)
@@ -410,7 +432,11 @@ private fun MetadataInfo(metadata: MessageMetadata) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserMessageCard(content: String, onLongClick: () -> Unit) {
+private fun UserMessageCard(
+    content: String,
+    attachedFile: FileAttachment?,
+    onLongClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .widthIn(max = 300.dp)
@@ -426,12 +452,53 @@ private fun UserMessageCard(content: String, onLongClick: () -> Unit) {
         ),
         colors = CardDefaults.cardColors(containerColor = GreenUser)
     ) {
-        Text(
-            text = content,
-            modifier = Modifier.padding(12.dp),
-            color = Color.Black,
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Column(modifier = Modifier.padding(12.dp)) {
+            if (attachedFile != null) {
+                MessageFileChip(
+                    fileName = attachedFile.fileName,
+                    characterCount = attachedFile.characterCount
+                )
+                if (content.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+            if (content.isNotEmpty()) {
+                Text(
+                    text = content,
+                    color = Color.Black,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageFileChip(
+    fileName: String,
+    characterCount: Int
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color.Black.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = Color.Black.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "$fileName ($characterCount chars)",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Black.copy(alpha = 0.8f)
+            )
+        }
     }
 }
 
@@ -996,15 +1063,30 @@ private fun MessageInput(
     text: String,
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
+    onAttachFileClick: () -> Unit,
     isLoading: Boolean,
+    isReadingFile: Boolean,
+    attachedFile: AttachedFileInfo?,
+    onClearAttachment: () -> Unit,
     gradientBrush: Brush,
     sendMessageMode: SendMessageMode
 ) {
+    val canSend = (text.isNotBlank() || attachedFile != null) && !isLoading
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(gradientBrush)
     ) {
+        if (attachedFile != null) {
+            AttachedFileChip(
+                fileName = attachedFile.fileName,
+                characterCount = attachedFile.characterCount,
+                onRemove = onClearAttachment,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1012,6 +1094,25 @@ private fun MessageInput(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            IconButton(
+                onClick = onAttachFileClick,
+                enabled = !isLoading && !isReadingFile
+            ) {
+                if (isReadingFile) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = "Прикрепить файл",
+                        tint = if (isLoading) Color.White.copy(alpha = 0.38f) else Color.White
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
@@ -1024,7 +1125,7 @@ private fun MessageInput(
                                     if (keyEvent.isShiftPressed) {
                                         false
                                     } else {
-                                        if (text.isNotBlank() && !isLoading) {
+                                        if (canSend) {
                                             onSendClick()
                                         }
                                         true
@@ -1032,7 +1133,7 @@ private fun MessageInput(
                                 }
                                 SendMessageMode.SHIFT_ENTER -> {
                                     if (keyEvent.isShiftPressed) {
-                                        if (text.isNotBlank() && !isLoading) {
+                                        if (canSend) {
                                             onSendClick()
                                         }
                                         true
@@ -1045,7 +1146,12 @@ private fun MessageInput(
                             false
                         }
                     },
-                placeholder = { Text("Введите сообщение...") },
+                placeholder = {
+                    Text(
+                        if (attachedFile != null) "Добавьте комментарий..."
+                        else "Введите сообщение..."
+                    )
+                },
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 4,
                 enabled = !isLoading,
@@ -1054,28 +1160,69 @@ private fun MessageInput(
 
             IconButton(
                 onClick = onSendClick,
-                enabled = text.isNotBlank() && !isLoading
+                enabled = canSend
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Отправить",
-                    tint = if (text.isNotBlank() && !isLoading)
-                        Color.White
-                    else
-                        Color.White.copy(alpha = 0.38f)
+                    tint = if (canSend) Color.White else Color.White.copy(alpha = 0.38f)
                 )
             }
         }
 
-        if (text.isNotEmpty()) {
-            val charCount = text.length
-            val estimatedTokens = estimateTokenCount(text)
+        if (text.isNotEmpty() || attachedFile != null) {
+            val charCount = text.length + (attachedFile?.characterCount ?: 0)
+            val estimatedTokens = estimateTokenCount(text) +
+                (attachedFile?.let { estimateTokenCount(it.content) } ?: 0)
             Text(
                 text = "$charCount chars · ~$estimatedTokens tokens",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun AttachedFileChip(
+    fileName: String,
+    characterCount: Int,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.2f)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = Color.White
+            )
+            Text(
+                text = "$fileName ($characterCount chars)",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White
+            )
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Удалить файл",
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.White
+                )
+            }
         }
     }
 }
