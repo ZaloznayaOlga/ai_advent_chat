@@ -11,8 +11,21 @@ data class Message(
     val jsonData: MessageJsonData? = null,
     val metadata: MessageMetadata? = null,
     val attachedFile: FileAttachment? = null,
-    val displayContent: String = content
+    val displayContent: String = content,
+    val summarizationInfo: SummarizationInfo? = null
 )
+
+/**
+ * Information about a summarization operation.
+ * Contains statistics about the summarized conversation.
+ */
+data class SummarizationInfo(
+    val summarizedMessageCount: Int,
+    val summarizedInputTokens: Int,
+    val summarizedOutputTokens: Int
+) {
+    val totalSummarizedTokens: Int get() = summarizedInputTokens + summarizedOutputTokens
+}
 
 /**
  * Information about an attached file in a user message.

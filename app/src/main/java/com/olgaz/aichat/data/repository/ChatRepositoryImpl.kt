@@ -136,6 +136,100 @@ class ChatRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun summarizeConversation(
+        messages: List<Message>,
+        settings: ChatSettings
+    ): Flow<Result<Message>> = flow {
+        try {
+            val summarizationPrompt = """
+Ты — помощник, который создает краткие, информативные резюме диалогов. Проанализируй предоставленную историю сообщений и создай сводку, которая захватит:
+
+1. **Контекст и цель:** С чего начался разговор и какова была изначальная цель пользователя?
+2. **Ключевые моменты и решения:** Какие основные вопросы были подняты, какие решения приняты или информация получена?
+3. **Текущий статус:** На чем диалог остановился? Какие открытые вопросы, следующие шаги или запланированные действия остались?
+4. **Тон и особенности:** Были ли особые эмоции, срочность или важные детали (например, имена, даты, числа), которые нужно сохранить?
+
+Создай сводку в виде короткого структурированного текста (до 5 предложений), понятного для ИИ-агента, который продолжит диалог. Будь точен и используй ключевые слова.
+""".trimIndent()
+
+            val conversationContext = messages
+                .filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }
+                .filter { it.summarizationInfo == null }
+                .joinToString("\n\n") { msg ->
+                    val role = if (msg.role == MessageRole.USER) "Пользователь" else "Ассистент"
+                    val content = msg.displayContent.ifEmpty { msg.content }
+                    "$role: $content"
+                }
+
+            val allMessages = listOf(
+                MessageDto(role = "system", content = summarizationPrompt),
+                MessageDto(role = "user", content = "Проанализируй и суммаризируй следующий диалог:\n\n$conversationContext")
+            )
+
+            val api = selectApi(settings.provider)
+            val modelName = getModelName(settings)
+            val request = ChatRequestDto(
+                model = modelName,
+                messages = allMessages,
+                temperature = 0.3f
+            )
+
+            val startTime = System.currentTimeMillis()
+            val response = api.sendMessage(request)
+            val responseTimeMs = System.currentTimeMillis() - startTime
+
+            val rawContent = response.choices.firstOrNull()?.message?.content
+
+            if (rawContent.isNullOrBlank()) {
+                emit(Result.failure(ApiException("Пустой ответ при суммаризации")))
+                return@flow
+            }
+
+            val actualModel = getActualModel(settings)
+            val metadata = MessageMetadata(
+                responseTimeMs = responseTimeMs,
+                inputTokens = response.usage?.promptTokens ?: 0,
+                outputTokens = response.usage?.completionTokens ?: 0,
+                provider = settings.provider,
+                model = actualModel
+            )
+
+            emit(Result.success(Message(
+                content = rawContent,
+                role = MessageRole.ASSISTANT,
+                metadata = metadata
+            )))
+        } catch (e: HttpException) {
+            val errorBody = try {
+                e.response()?.errorBody()?.string()
+            } catch (_: Exception) {
+                null
+            }
+
+            val baseMessage = when (e.code()) {
+                400 -> "Неверный формат запроса."
+                401 -> "Ошибка доступа к API."
+                403 -> "Доступ запрещён."
+                429 -> "Слишком много запросов."
+                500, 502, 503 -> "Сервер временно недоступен."
+                else -> "Ошибка сервера: ${e.code()}"
+            }
+
+            val errorMessage = if (!errorBody.isNullOrBlank()) {
+                "$baseMessage\n\nОтвет сервера: $errorBody"
+            } else {
+                baseMessage
+            }
+            emit(Result.failure(ApiException(errorMessage)))
+        } catch (e: UnknownHostException) {
+            emit(Result.failure(ApiException("Нет подключения к интернету")))
+        } catch (e: SocketTimeoutException) {
+            emit(Result.failure(ApiException("Превышено время ожидания")))
+        } catch (e: Exception) {
+            emit(Result.failure(ApiException("Ошибка суммаризации: ${e.localizedMessage}")))
+        }
+    }
+
     private fun selectApi(provider: AiProvider): ChatApi = when (provider) {
         AiProvider.DEEPSEEK -> deepSeekApi
         AiProvider.OPENAI -> openAiApi

@@ -74,6 +74,23 @@ enum class SystemPromptMode(val displayName: String) {
 }
 
 /**
+ * Настройки автоматической суммаризации диалога.
+ * Суммаризация срабатывает при превышении ЛЮБОГО порога (OR логика).
+ */
+data class SummarizationSettings(
+    val enabled: Boolean = false,
+    val messageThreshold: Int = 10,
+    val tokenThreshold: Int = 10_000
+) {
+    companion object {
+        const val MIN_MESSAGE_THRESHOLD = 4
+        const val MAX_MESSAGE_THRESHOLD = 50
+        const val MIN_TOKEN_THRESHOLD = 1_000
+        const val MAX_TOKEN_THRESHOLD = 100_000
+    }
+}
+
+/**
  * Настройки чата для текущей сессии
  */
 data class ChatSettings(
@@ -85,5 +102,6 @@ data class ChatSettings(
     val sendMessageMode: SendMessageMode = SendMessageMode.ENTER,
     val systemPromptMode: SystemPromptMode = SystemPromptMode.DEFAULT,
     val customSystemPrompt: String = "",
-    val temperature: Float = 1.0f
+    val temperature: Float = 1.0f,
+    val summarization: SummarizationSettings = SummarizationSettings()
 )

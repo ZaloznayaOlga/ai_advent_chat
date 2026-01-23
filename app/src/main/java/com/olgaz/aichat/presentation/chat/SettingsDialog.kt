@@ -48,6 +48,7 @@ import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
+import com.olgaz.aichat.domain.model.SummarizationSettings
 import com.olgaz.aichat.domain.model.SystemPromptMode
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -191,6 +192,57 @@ fun SettingsDialog(
                                 maxLines = 6
                             )
                         }
+                    }
+
+                    SwitchSettingItem(
+                        label = "Суммаризация",
+                        checked = localSettings.summarization.enabled,
+                        onCheckedChange = { enabled ->
+                            localSettings = localSettings.copy(
+                                summarization = localSettings.summarization.copy(enabled = enabled)
+                            )
+                        }
+                    )
+
+                    if (localSettings.summarization.enabled) {
+                        SliderSettingItem(
+                            label = "Порог сообщений",
+                            value = localSettings.summarization.messageThreshold.toFloat(),
+                            onValueChange = { value ->
+                                localSettings = localSettings.copy(
+                                    summarization = localSettings.summarization.copy(
+                                        messageThreshold = value.toInt()
+                                    )
+                                )
+                            },
+                            valueRange = SummarizationSettings.MIN_MESSAGE_THRESHOLD.toFloat()..
+                                         SummarizationSettings.MAX_MESSAGE_THRESHOLD.toFloat(),
+                            steps = (SummarizationSettings.MAX_MESSAGE_THRESHOLD -
+                                     SummarizationSettings.MIN_MESSAGE_THRESHOLD) / 2 - 1,
+                            valueFormatter = { "${it.toInt()}" }
+                        )
+
+                        SliderSettingItem(
+                            label = "Порог токенов (K)",
+                            value = (localSettings.summarization.tokenThreshold / 1000f),
+                            onValueChange = { value ->
+                                localSettings = localSettings.copy(
+                                    summarization = localSettings.summarization.copy(
+                                        tokenThreshold = (value * 1000).toInt()
+                                    )
+                                )
+                            },
+                            valueRange = (SummarizationSettings.MIN_TOKEN_THRESHOLD / 1000f)..
+                                         (SummarizationSettings.MAX_TOKEN_THRESHOLD / 1000f),
+                            steps = 19,
+                            valueFormatter = { "${it.toInt()}K" }
+                        )
+
+                        Text(
+                            text = "Суммаризация сработает при превышении любого порога",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     SwitchSettingItem(
@@ -353,7 +405,8 @@ private fun SliderSettingItem(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int
+    steps: Int,
+    valueFormatter: (Float) -> String = { String.format("%.1f", it) }
 ) {
     Column {
         Row(
@@ -366,7 +419,7 @@ private fun SliderSettingItem(
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = String.format("%.1f", value),
+                text = valueFormatter(value),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )

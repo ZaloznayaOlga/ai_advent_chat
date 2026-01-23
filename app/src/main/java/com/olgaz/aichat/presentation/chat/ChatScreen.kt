@@ -104,6 +104,7 @@ import com.olgaz.aichat.domain.model.MessageMetadata
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
+import com.olgaz.aichat.domain.model.SummarizationInfo
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
 import com.olgaz.aichat.ui.theme.GradientDarkStart
 import com.olgaz.aichat.ui.theme.GradientLightEnd
@@ -112,6 +113,7 @@ import com.olgaz.aichat.ui.theme.GreenAssistant
 import com.olgaz.aichat.ui.theme.GreenUser
 import com.olgaz.aichat.ui.theme.GreyDark
 import com.olgaz.aichat.ui.theme.GreyLight
+import com.olgaz.aichat.ui.theme.OrangeSummarization
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -263,6 +265,12 @@ fun ChatScreen(
                                 ThinkingIndicator()
                             }
                         }
+
+                        if (uiState.isSummarizing) {
+                            item {
+                                SummarizingIndicator()
+                            }
+                        }
                     }
                 }
             }
@@ -272,7 +280,7 @@ fun ChatScreen(
                 onTextChange = viewModel::onInputTextChanged,
                 onSendClick = viewModel::sendMessage,
                 onAttachFileClick = { filePickerLauncher.launch(arrayOf("text/plain")) },
-                isLoading = uiState.isLoading,
+                isLoading = uiState.isLoading || uiState.isSummarizing,
                 isReadingFile = uiState.isReadingFile,
                 attachedFile = uiState.attachedFile,
                 onClearAttachment = viewModel::clearAttachedFile,
@@ -331,16 +339,25 @@ private fun MessageItem(message: Message) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-        if (isUser) {
-            UserMessageCard(
-                content = message.displayContent,
-                attachedFile = message.attachedFile,
-                onLongClick = onCopyText
-            )
-        } else {
-            if (message.jsonData != null) {
+        when {
+            message.summarizationInfo != null -> {
+                SummarizationMessageCard(
+                    content = message.content,
+                    summarizationInfo = message.summarizationInfo,
+                    onLongClick = onCopyText
+                )
+            }
+            isUser -> {
+                UserMessageCard(
+                    content = message.displayContent,
+                    attachedFile = message.attachedFile,
+                    onLongClick = onCopyText
+                )
+            }
+            message.jsonData != null -> {
                 AssistantStructuredMessage(jsonData = message.jsonData, onLongClick = onCopyText)
-            } else {
+            }
+            else -> {
                 AssistantSimpleMessageCard(content = message.content, onLongClick = onCopyText)
             }
         }
@@ -526,6 +543,60 @@ private fun AssistantSimpleMessageCard(content: String, onLongClick: () -> Unit)
             color = Color.Black,
             style = MaterialTheme.typography.bodyMedium
         )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SummarizationMessageCard(
+    content: String,
+    summarizationInfo: SummarizationInfo,
+    onLongClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { },
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = OrangeSummarization)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "📋",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Резюме диалога",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE65100)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Суммаризировано: ${summarizationInfo.summarizedMessageCount} сообщений, " +
+                       "${summarizationInfo.totalSummarizedTokens} токенов",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF795548)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black
+            )
+        }
     }
 }
 
@@ -1059,6 +1130,50 @@ private fun ThinkingIndicator() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Black
             )
+        }
+    }
+}
+
+@Composable
+private fun SummarizingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "summarizing")
+    val dotsCount by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dotsAnimation"
+    )
+
+    val dots = ".".repeat(dotsCount.toInt().coerceIn(0, 3))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(OrangeSummarization)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(0xFFE65100)
+                )
+                Text(
+                    text = "Суммаризация диалога$dots",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFE65100)
+                )
+            }
         }
     }
 }

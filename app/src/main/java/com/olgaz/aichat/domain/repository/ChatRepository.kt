@@ -7,4 +7,5 @@ import kotlinx.coroutines.flow.Flow
 interface ChatRepository {
     fun sendMessage(messages: List<Message>): Flow<Result<Message>>
     fun sendMessage(messages: List<Message>, settings: ChatSettings): Flow<Result<Message>>
+    fun summarizeConversation(messages: List<Message>, settings: ChatSettings): Flow<Result<Message>>
 }

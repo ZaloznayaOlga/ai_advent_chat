@@ -19,6 +19,9 @@ val GreyDark = Color(0xFF2D2D2D)
 val GreyMediumLight = Color(0xFFE0E0E0)
 val GreyMediumDark = Color(0xFF424242)
 
+// Orange tones for summarization
+val OrangeSummarization = Color(0xFFFFE0B2)
+
 // Gradient colors
 val GradientLightStart = Color(0xFFBDBDBD)
 val GradientLightEnd = Color(0xFF9E9E9E)

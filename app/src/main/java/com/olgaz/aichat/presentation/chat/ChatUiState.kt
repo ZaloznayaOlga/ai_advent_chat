@@ -7,6 +7,7 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val inputText: String = "",
     val isLoading: Boolean = false,
+    val isSummarizing: Boolean = false,
     val error: String? = null,
     val settings: ChatSettings = ChatSettings(),
     val isSettingsDialogVisible: Boolean = false,
