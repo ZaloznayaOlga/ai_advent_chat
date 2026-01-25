@@ -10,6 +10,7 @@ import com.olgaz.aichat.domain.model.FileReadResult
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.SummarizationInfo
+import com.olgaz.aichat.domain.repository.ChatHistoryRepository
 import com.olgaz.aichat.domain.repository.ChatRepository
 import com.olgaz.aichat.domain.usecase.ReadFileUseCase
 import com.olgaz.aichat.domain.usecase.SendMessageUseCase
@@ -25,11 +26,84 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     private val sendMessageUseCase: SendMessageUseCase,
     private val readFileUseCase: ReadFileUseCase,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val chatHistoryRepository: ChatHistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    init {
+        loadSavedData()
+    }
+
+    private fun loadSavedData() {
+        viewModelScope.launch {
+            try {
+                val savedSettings = chatHistoryRepository.getSettings()
+                if (savedSettings != null) {
+                    _uiState.update { it.copy(settings = savedSettings) }
+                }
+
+                val messages = chatHistoryRepository.getAllMessagesOnce()
+                val shouldShowSummaryButton = messages.isNotEmpty() &&
+                    messages.lastOrNull()?.summarizationInfo == null
+                _uiState.update {
+                    it.copy(
+                        messages = messages,
+                        showSummaryButton = shouldShowSummaryButton
+                    )
+                }
+
+                if (chatHistoryRepository.hasUnansweredUserMessage()) {
+                    retryLastMessage()
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(error = "Ошибка загрузки данных: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun retryLastMessage() {
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch {
+            try {
+                val apiContext = chatHistoryRepository.getMessagesForApiContext()
+
+                sendMessageUseCase(apiContext, _uiState.value.settings).collect { result ->
+                    result.fold(
+                        onSuccess = { assistantMessage ->
+                            chatHistoryRepository.saveMessage(assistantMessage)
+
+                            val updatedMessages = _uiState.value.messages + assistantMessage
+                            _uiState.update {
+                                it.copy(messages = updatedMessages, isLoading = false)
+                            }
+                            checkAndTriggerSummarization(updatedMessages)
+                        },
+                        onFailure = { exception ->
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = exception.message ?: "Unknown error occurred"
+                                )
+                            }
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Ошибка повторной отправки: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
 
     fun onInputTextChanged(text: String) {
         _uiState.update { it.copy(inputText = text) }
@@ -41,7 +115,6 @@ class ChatViewModel @Inject constructor(
 
         if ((messageText.isEmpty() && attachedFile == null) || _uiState.value.isLoading) return
 
-        // Content for API - includes file content
         val apiContent = buildString {
             if (attachedFile != null) {
                 append("[Файл: ${attachedFile.fileName}]\n")
@@ -56,7 +129,6 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Display content - only user's text (without file content)
         val displayText = messageText.ifEmpty { "" }
 
         val userMessage = Message(
@@ -77,14 +149,21 @@ class ChatViewModel @Inject constructor(
                 inputText = "",
                 attachedFile = null,
                 isLoading = true,
-                error = null
+                error = null,
+                showSummaryButton = false
             )
         }
 
         viewModelScope.launch {
-            sendMessageUseCase(_uiState.value.messages, _uiState.value.settings).collect { result ->
+            chatHistoryRepository.saveMessage(userMessage)
+
+            val apiContext = chatHistoryRepository.getMessagesForApiContext()
+
+            sendMessageUseCase(apiContext, _uiState.value.settings).collect { result ->
                 result.fold(
                     onSuccess = { assistantMessage ->
+                        chatHistoryRepository.saveMessage(assistantMessage)
+
                         val updatedMessages = _uiState.value.messages + assistantMessage
                         _uiState.update {
                             it.copy(
@@ -111,13 +190,20 @@ class ChatViewModel @Inject constructor(
         val settings = _uiState.value.settings.summarization
         if (!settings.enabled) return
 
-        val relevantMessages = messages.filter {
-            it.summarizationInfo == null &&
-            (it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT)
+        // Find messages after the last summary
+        val lastSummaryIndex = messages.indexOfLast { it.summarizationInfo != null }
+        val messagesAfterSummary = if (lastSummaryIndex >= 0) {
+            messages.subList(lastSummaryIndex + 1, messages.size)
+        } else {
+            messages
+        }
+
+        val relevantMessages = messagesAfterSummary.filter {
+            it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT
         }
         val messageCount = relevantMessages.size
 
-        val tokens = ConversationTokens.fromMessages(messages)
+        val tokens = ConversationTokens.fromMessages(relevantMessages)
         val tokenCount = tokens.totalTokens
 
         val shouldSummarize = messageCount >= settings.messageThreshold ||
@@ -136,6 +222,19 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isSummarizing = true) }
 
         viewModelScope.launch {
+            // Only summarize messages after the last summary
+            val lastSummaryIndex = messages.indexOfLast { it.summarizationInfo != null }
+            val messagesAfterSummary = if (lastSummaryIndex >= 0) {
+                messages.subList(lastSummaryIndex + 1, messages.size)
+            } else {
+                messages
+            }
+
+            val messagesToSummarize = messagesAfterSummary.filter {
+                it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT
+            }
+            val messageIds = messagesToSummarize.map { it.id }
+
             chatRepository.summarizeConversation(messages, _uiState.value.settings)
                 .collect { result ->
                     result.fold(
@@ -147,9 +246,15 @@ class ChatViewModel @Inject constructor(
                                     summarizedOutputTokens = tokens.totalOutputTokens
                                 )
                             )
+
+                            chatHistoryRepository.saveSummaryAndMarkCovered(
+                                summaryWithInfo,
+                                messageIds
+                            )
+
                             _uiState.update {
                                 it.copy(
-                                    messages = listOf(summaryWithInfo),
+                                    messages = it.messages + summaryWithInfo,
                                     isSummarizing = false
                                 )
                             }
@@ -181,10 +286,43 @@ class ChatViewModel @Inject constructor(
 
     fun updateSettings(settings: ChatSettings) {
         _uiState.update { it.copy(settings = settings) }
+        viewModelScope.launch {
+            try {
+                chatHistoryRepository.saveSettings(settings)
+            } catch (e: Exception) {
+                // Ignore save errors - settings are still in memory
+            }
+        }
     }
 
     fun clearChatHistory() {
-        _uiState.update { it.copy(messages = emptyList()) }
+        viewModelScope.launch {
+            chatHistoryRepository.clearAllHistory()
+            _uiState.update { it.copy(messages = emptyList(), showSummaryButton = false) }
+        }
+    }
+
+    fun triggerManualSummarization() {
+        val messages = _uiState.value.messages
+        if (messages.isEmpty()) return
+
+        _uiState.update { it.copy(showSummaryButton = false) }
+
+        val lastSummaryIndex = messages.indexOfLast { it.summarizationInfo != null }
+        val messagesAfterSummary = if (lastSummaryIndex >= 0) {
+            messages.subList(lastSummaryIndex + 1, messages.size)
+        } else {
+            messages
+        }
+
+        val relevantMessages = messagesAfterSummary.filter {
+            it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT
+        }
+
+        if (relevantMessages.isEmpty()) return
+
+        val tokens = ConversationTokens.fromMessages(relevantMessages)
+        performSummarization(messages, relevantMessages.size, tokens)
     }
 
     fun onFileSelected(uri: Uri) {

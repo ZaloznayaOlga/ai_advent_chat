@@ -12,7 +12,8 @@ data class ChatUiState(
     val settings: ChatSettings = ChatSettings(),
     val isSettingsDialogVisible: Boolean = false,
     val attachedFile: AttachedFileInfo? = null,
-    val isReadingFile: Boolean = false
+    val isReadingFile: Boolean = false,
+    val showSummaryButton: Boolean = false
 )
 
 data class AttachedFileInfo(

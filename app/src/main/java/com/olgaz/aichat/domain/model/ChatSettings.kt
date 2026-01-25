@@ -78,7 +78,7 @@ enum class SystemPromptMode(val displayName: String) {
  * Суммаризация срабатывает при превышении ЛЮБОГО порога (OR логика).
  */
 data class SummarizationSettings(
-    val enabled: Boolean = false,
+    val enabled: Boolean = true,
     val messageThreshold: Int = 10,
     val tokenThreshold: Int = 10_000
 ) {

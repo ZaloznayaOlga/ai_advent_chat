@@ -275,6 +275,12 @@ fun ChatScreen(
                 }
             }
 
+            if (uiState.showSummaryButton && !uiState.isLoading && !uiState.isSummarizing) {
+                SummaryRequestButton(
+                    onClick = viewModel::triggerManualSummarization
+                )
+            }
+
             MessageInput(
                 text = uiState.inputText,
                 onTextChange = viewModel::onInputTextChanged,
@@ -1175,6 +1181,28 @@ private fun SummarizingIndicator() {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SummaryRequestButton(
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF2196F3)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            text = "Показать краткую историю диалога",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White
+        )
     }
 }
 
