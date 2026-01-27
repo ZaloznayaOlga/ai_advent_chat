@@ -3,10 +3,12 @@ package com.olgaz.aichat.presentation.chat
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.olgaz.aichat.BuildConfig
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.ConversationTokens
 import com.olgaz.aichat.domain.model.FileAttachment
 import com.olgaz.aichat.domain.model.FileReadResult
+import com.olgaz.aichat.domain.model.McpServerConfig
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.SummarizationInfo
@@ -14,6 +16,11 @@ import com.olgaz.aichat.domain.repository.ChatHistoryRepository
 import com.olgaz.aichat.domain.repository.ChatRepository
 import com.olgaz.aichat.domain.usecase.ReadFileUseCase
 import com.olgaz.aichat.domain.usecase.SendMessageUseCase
+import com.olgaz.aichat.domain.usecase.mcp.CallMcpToolUseCase
+import com.olgaz.aichat.domain.usecase.mcp.ConnectMcpUseCase
+import com.olgaz.aichat.domain.usecase.mcp.DisconnectMcpUseCase
+import com.olgaz.aichat.domain.usecase.mcp.GetMcpToolsUseCase
+import com.olgaz.aichat.domain.usecase.mcp.ObserveMcpConnectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +34,12 @@ class ChatViewModel @Inject constructor(
     private val sendMessageUseCase: SendMessageUseCase,
     private val readFileUseCase: ReadFileUseCase,
     private val chatRepository: ChatRepository,
-    private val chatHistoryRepository: ChatHistoryRepository
+    private val chatHistoryRepository: ChatHistoryRepository,
+    private val connectMcpUseCase: ConnectMcpUseCase,
+    private val disconnectMcpUseCase: DisconnectMcpUseCase,
+    private val getMcpToolsUseCase: GetMcpToolsUseCase,
+    private val callMcpToolUseCase: CallMcpToolUseCase,
+    private val observeMcpConnectionUseCase: ObserveMcpConnectionUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -35,6 +47,40 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadSavedData()
+        observeMcpState()
+    }
+
+    private fun observeMcpState() {
+        viewModelScope.launch {
+            observeMcpConnectionUseCase().collect { state ->
+                _uiState.update { it.copy(mcpConnectionState = state) }
+            }
+        }
+        viewModelScope.launch {
+            getMcpToolsUseCase().collect { tools ->
+                _uiState.update { it.copy(mcpTools = tools) }
+            }
+        }
+    }
+
+    fun connectToMcp() {
+        val settings = _uiState.value.settings
+        val url = settings.mcpServerUrl.ifEmpty { BuildConfig.MCP_SERVER_URL }
+
+        if (url.isBlank()) {
+            _uiState.update { it.copy(error = "MCP Server URL не настроен") }
+            return
+        }
+
+        viewModelScope.launch {
+            connectMcpUseCase(McpServerConfig(url = url))
+        }
+    }
+
+    fun disconnectMcp() {
+        viewModelScope.launch {
+            disconnectMcpUseCase()
+        }
     }
 
     private fun loadSavedData() {
@@ -72,8 +118,9 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val apiContext = chatHistoryRepository.getMessagesForApiContext()
+                val mcpTools = _uiState.value.mcpTools
 
-                sendMessageUseCase(apiContext, _uiState.value.settings).collect { result ->
+                sendMessageUseCase(apiContext, _uiState.value.settings, mcpTools).collect { result ->
                     result.fold(
                         onSuccess = { assistantMessage ->
                             chatHistoryRepository.saveMessage(assistantMessage)
@@ -158,8 +205,9 @@ class ChatViewModel @Inject constructor(
             chatHistoryRepository.saveMessage(userMessage)
 
             val apiContext = chatHistoryRepository.getMessagesForApiContext()
+            val mcpTools = _uiState.value.mcpTools
 
-            sendMessageUseCase(apiContext, _uiState.value.settings).collect { result ->
+            sendMessageUseCase(apiContext, _uiState.value.settings, mcpTools).collect { result ->
                 result.fold(
                     onSuccess = { assistantMessage ->
                         chatHistoryRepository.saveMessage(assistantMessage)

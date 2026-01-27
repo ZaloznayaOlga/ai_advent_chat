@@ -245,6 +245,45 @@ fun SettingsDialog(
                         )
                     }
 
+                    // MCP Settings
+                    SwitchSettingItem(
+                        label = "MCP Tools",
+                        description = "Model Context Protocol для вызова инструментов",
+                        checked = localSettings.mcpEnabled,
+                        onCheckedChange = { enabled ->
+                            localSettings = localSettings.copy(mcpEnabled = enabled)
+                        }
+                    )
+
+                    if (localSettings.mcpEnabled) {
+                        Column {
+                            Text(
+                                text = "MCP Server URL",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            OutlinedTextField(
+                                value = localSettings.mcpServerUrl,
+                                onValueChange = { url ->
+                                    localSettings = localSettings.copy(mcpServerUrl = url)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("http://localhost:3000/mcp") },
+                                singleLine = true
+                            )
+
+                            Text(
+                                text = "Оставьте пустым для использования URL из конфигурации",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+
                     SwitchSettingItem(
                         label = "Отправка по Shift+Enter",
                         description = "Если выключено - Enter отправляет сообщение",

@@ -35,6 +35,8 @@ android {
         buildConfigField("String", "OPENAI_BASE_URL", "\"https://api.openai.com/v1/\"")
         buildConfigField("String", "HUGGINGFACE_API_KEY", "\"${localProperties.getProperty("HUGGINGFACE_API_KEY", "")}\"")
         buildConfigField("String", "HUGGINGFACE_BASE_URL", "\"https://router.huggingface.co/v1/\"")
+        buildConfigField("String", "MCP_SERVER_URL", "\"${localProperties.getProperty("MCP_SERVER_URL", "")}\"")
+
     }
 
     buildTypes {
@@ -99,6 +101,14 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // MCP SDK
+    implementation(libs.mcp.kotlin.sdk)
+
+    // Ktor (for MCP SSE transport)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
 
     // Testing
     testImplementation(libs.junit)

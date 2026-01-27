@@ -26,6 +26,7 @@ object DatabaseModule {
             ChatDatabase::class.java,
             ChatDatabase.DATABASE_NAME
         )
+            .addMigrations(ChatDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
     }

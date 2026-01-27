@@ -43,5 +43,11 @@ data class SettingsEntity(
     val summarizationMessageThreshold: Int,
 
     @ColumnInfo(name = "summarization_token_threshold")
-    val summarizationTokenThreshold: Int
+    val summarizationTokenThreshold: Int,
+
+    @ColumnInfo(name = "mcp_enabled", defaultValue = "0")
+    val mcpEnabled: Boolean = false,
+
+    @ColumnInfo(name = "mcp_server_url", defaultValue = "")
+    val mcpServerUrl: String = ""
 )

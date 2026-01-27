@@ -12,7 +12,8 @@ data class Message(
     val metadata: MessageMetadata? = null,
     val attachedFile: FileAttachment? = null,
     val displayContent: String = content,
-    val summarizationInfo: SummarizationInfo? = null
+    val summarizationInfo: SummarizationInfo? = null,
+    val usedTools: List<String> = emptyList()
 )
 
 /**

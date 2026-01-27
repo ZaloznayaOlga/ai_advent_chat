@@ -103,5 +103,7 @@ data class ChatSettings(
     val systemPromptMode: SystemPromptMode = SystemPromptMode.DEFAULT,
     val customSystemPrompt: String = "",
     val temperature: Float = 1.0f,
-    val summarization: SummarizationSettings = SummarizationSettings()
+    val summarization: SummarizationSettings = SummarizationSettings(),
+    val mcpEnabled: Boolean = false,
+    val mcpServerUrl: String = ""
 )

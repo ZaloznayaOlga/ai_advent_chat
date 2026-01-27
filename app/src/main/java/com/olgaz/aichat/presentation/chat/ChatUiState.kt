@@ -1,6 +1,8 @@
 package com.olgaz.aichat.presentation.chat
 
 import com.olgaz.aichat.domain.model.ChatSettings
+import com.olgaz.aichat.domain.model.McpConnectionState
+import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.Message
 
 data class ChatUiState(
@@ -13,7 +15,9 @@ data class ChatUiState(
     val isSettingsDialogVisible: Boolean = false,
     val attachedFile: AttachedFileInfo? = null,
     val isReadingFile: Boolean = false,
-    val showSummaryButton: Boolean = false
+    val showSummaryButton: Boolean = false,
+    val mcpConnectionState: McpConnectionState = McpConnectionState.Disconnected,
+    val mcpTools: List<McpTool> = emptyList()
 )
 
 data class AttachedFileInfo(

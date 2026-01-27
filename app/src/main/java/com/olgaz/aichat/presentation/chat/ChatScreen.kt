@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -105,6 +106,8 @@ import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationInfo
+import com.olgaz.aichat.domain.model.McpConnectionState
+import com.olgaz.aichat.presentation.chat.components.McpToolsPanel
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
 import com.olgaz.aichat.ui.theme.GradientDarkStart
 import com.olgaz.aichat.ui.theme.GradientLightEnd
@@ -281,6 +284,17 @@ fun ChatScreen(
                 )
             }
 
+            // MCP Tools Panel
+            if (uiState.settings.mcpEnabled) {
+                McpToolsPanel(
+                    connectionState = uiState.mcpConnectionState,
+                    tools = uiState.mcpTools,
+                    onConnect = viewModel::connectToMcp,
+                    onDisconnect = viewModel::disconnectMcp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             MessageInput(
                 text = uiState.inputText,
                 onTextChange = viewModel::onInputTextChanged,
@@ -390,6 +404,46 @@ private fun MessageItem(message: Message) {
         // Metadata info for assistant messages
         if (!isUser && message.metadata != null) {
             MetadataInfo(metadata = message.metadata)
+        }
+
+        // Used MCP tools
+        if (!isUser && message.usedTools.isNotEmpty()) {
+            UsedToolsInfo(tools = message.usedTools)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun UsedToolsInfo(tools: List<String>) {
+    FlowRow(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        tools.forEach { toolName ->
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF7986CB).copy(alpha = 0.2f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Build,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = Color(0xFF5C6BC0)
+                    )
+                    Text(
+                        text = toolName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF5C6BC0)
+                    )
+                }
+            }
         }
     }
 }

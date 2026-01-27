@@ -1,6 +1,7 @@
 package com.olgaz.aichat.domain.usecase
 
 import com.olgaz.aichat.domain.model.ChatSettings
+import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.Flow
@@ -15,5 +16,13 @@ class SendMessageUseCase @Inject constructor(
 
     operator fun invoke(messages: List<Message>, settings: ChatSettings): Flow<Result<Message>> {
         return repository.sendMessage(messages, settings)
+    }
+
+    operator fun invoke(
+        messages: List<Message>,
+        settings: ChatSettings,
+        mcpTools: List<McpTool>
+    ): Flow<Result<Message>> {
+        return repository.sendMessage(messages, settings, mcpTools)
     }
 }
