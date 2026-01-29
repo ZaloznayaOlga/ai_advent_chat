@@ -22,8 +22,9 @@ class ReminderToolHandler @Inject constructor(
         private const val TOOL_LIST = "list_reminders"
         private const val TOOL_COMPLETE = "complete_reminder"
         private const val TOOL_DELETE = "delete_reminder"
+        private const val TOOL_DELETE_ALL = "delete_all_reminders"
 
-        private val TOOL_NAMES = setOf(TOOL_CREATE, TOOL_LIST, TOOL_COMPLETE, TOOL_DELETE)
+        private val TOOL_NAMES = setOf(TOOL_CREATE, TOOL_LIST, TOOL_COMPLETE, TOOL_DELETE, TOOL_DELETE_ALL)
     }
 
     override fun getTools(): List<McpTool> = listOf(
@@ -86,6 +87,13 @@ class ReminderToolHandler @Inject constructor(
                 ),
                 required = listOf("id")
             )
+        ),
+        McpTool(
+            name = TOOL_DELETE_ALL,
+            description = "Удалить все напоминания/задачи. Используй когда пользователь просит удалить все напоминания, очистить список задач или убрать всё.",
+            inputSchema = McpToolInputSchema(
+                type = "object"
+            )
         )
     )
 
@@ -101,6 +109,7 @@ class ReminderToolHandler @Inject constructor(
                 TOOL_LIST -> handleList(arguments)
                 TOOL_COMPLETE -> handleComplete(arguments)
                 TOOL_DELETE -> handleDelete(arguments)
+                TOOL_DELETE_ALL -> handleDeleteAll()
                 else -> McpToolCallResult.Error(
                     toolName = toolName,
                     message = "Неизвестный инструмент: $toolName"
@@ -231,5 +240,17 @@ class ReminderToolHandler @Inject constructor(
                 message = "Напоминание с ID:$id не найдено."
             )
         }
+    }
+
+    private suspend fun handleDeleteAll(): McpToolCallResult {
+        val deleted = reminderDao.deleteAll()
+
+        return McpToolCallResult.Success(
+            toolName = TOOL_DELETE_ALL,
+            content = listOf(McpContent.Text(
+                if (deleted > 0) "Все напоминания удалены (всего: $deleted)."
+                else "Список напоминаний уже пуст."
+            ))
+        )
     }
 }
