@@ -22,6 +22,7 @@ import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import com.olgaz.aichat.domain.repository.ChatRepository
+import com.olgaz.aichat.domain.repository.LocalToolHandler
 import com.olgaz.aichat.domain.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -46,7 +47,8 @@ class ChatRepositoryImpl @Inject constructor(
     @OpenAiApi private val openAiApi: ChatApi,
     @HuggingFaceApi private val huggingFaceApi: ChatApi,
     private val systemPromptProvider: SystemPromptProvider,
-    private val mcpRepository: McpRepository
+    private val mcpRepository: McpRepository,
+    private val localToolHandler: LocalToolHandler
 ) : ChatRepository {
 
     private val json = Json {
@@ -155,8 +157,8 @@ class ChatRepositoryImpl @Inject constructor(
         settings: ChatSettings,
         mcpTools: List<McpTool>
     ): Flow<Result<Message>> = flow {
-        // Если нет MCP tools, используем обычную отправку
-        if (mcpTools.isEmpty()) {
+        // Если нет MCP tools и reminder выключен, используем обычную отправку
+        if (mcpTools.isEmpty() && !settings.mcpReminderEnabled) {
             sendMessage(messages, settings).collect { emit(it) }
             return@flow
         }
@@ -176,8 +178,12 @@ class ChatRepositoryImpl @Inject constructor(
                 )
             }
 
-            // Конвертируем MCP tools в формат API
-            val toolDtos = mcpTools.map { it.toToolDto() }
+            // Собираем все tools: MCP (внешние) + локальные (reminder)
+            val allTools = mcpTools.toMutableList()
+            if (settings.mcpReminderEnabled) {
+                allTools.addAll(localToolHandler.getTools())
+            }
+            val toolDtos = allTools.map { it.toToolDto() }
 
             val api = selectApi(settings.provider)
             val modelName = getModelName(settings)
@@ -289,8 +295,16 @@ class ChatRepositoryImpl @Inject constructor(
                         emptyMap<String, Any?>()
                     }
 
-                    // Вызываем MCP tool
-                    val toolResult = mcpRepository.callTool(toolName, arguments)
+                    // Вызываем tool: локальный или MCP
+                    val toolResult = if (localToolHandler.canHandle(toolName)) {
+                        try {
+                            Result.success(localToolHandler.handleToolCall(toolName, arguments))
+                        } catch (e: Exception) {
+                            Result.failure(e)
+                        }
+                    } else {
+                        mcpRepository.callTool(toolName, arguments)
+                    }
                     val toolContent = when (val result = toolResult.getOrNull()) {
                         is McpToolCallResult.Success -> {
                             result.content.joinToString("\n") { content ->

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.olgaz.aichat.data.local.dao.MessageDao
 import com.olgaz.aichat.data.local.dao.SettingsDao
 import com.olgaz.aichat.data.local.database.ChatDatabase
+import com.olgaz.aichat.mcptools.reminder.ReminderDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,7 +27,7 @@ object DatabaseModule {
             ChatDatabase::class.java,
             ChatDatabase.DATABASE_NAME
         )
-            .addMigrations(ChatDatabase.MIGRATION_2_3)
+            .addMigrations(ChatDatabase.MIGRATION_2_3, ChatDatabase.MIGRATION_3_4, ChatDatabase.MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -41,5 +42,11 @@ object DatabaseModule {
     @Singleton
     fun provideSettingsDao(database: ChatDatabase): SettingsDao {
         return database.settingsDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideReminderDao(database: ChatDatabase): ReminderDao {
+        return database.reminderDao()
     }
 }

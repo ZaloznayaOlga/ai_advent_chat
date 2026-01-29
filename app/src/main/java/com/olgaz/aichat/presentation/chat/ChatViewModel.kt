@@ -89,6 +89,9 @@ class ChatViewModel @Inject constructor(
                 val savedSettings = chatHistoryRepository.getSettings()
                 if (savedSettings != null) {
                     _uiState.update { it.copy(settings = savedSettings) }
+                    if (savedSettings.mcpWeatherEnabled) {
+                        connectToMcp()
+                    }
                 }
 
                 val messages = chatHistoryRepository.getAllMessagesOnce()

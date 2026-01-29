@@ -8,6 +8,8 @@ import com.olgaz.aichat.domain.provider.FileContentReader
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import com.olgaz.aichat.domain.repository.ChatHistoryRepository
 import com.olgaz.aichat.domain.repository.ChatRepository
+import com.olgaz.aichat.domain.repository.LocalToolHandler
+import com.olgaz.aichat.mcptools.reminder.ReminderToolHandler
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -41,4 +43,10 @@ abstract class RepositoryModule {
     abstract fun bindFileContentReader(
         fileContentReaderImpl: FileContentReaderImpl
     ): FileContentReader
+
+    @Binds
+    @Singleton
+    abstract fun bindLocalToolHandler(
+        reminderToolHandler: ReminderToolHandler
+    ): LocalToolHandler
 }

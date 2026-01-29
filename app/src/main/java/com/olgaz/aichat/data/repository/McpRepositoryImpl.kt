@@ -3,7 +3,6 @@ package com.olgaz.aichat.data.repository
 import android.util.Log
 import com.olgaz.aichat.domain.model.McpConnectionState
 import com.olgaz.aichat.domain.model.McpContent
-import com.olgaz.aichat.domain.model.McpPropertySchema
 import com.olgaz.aichat.domain.model.McpServerConfig
 import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.McpToolCallResult
@@ -18,11 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -192,29 +187,6 @@ class McpRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Ping failed", e)
             Result.success(false)
-        }
-    }
-
-    private fun mapInputSchema(schema: JsonElement?): McpToolInputSchema {
-        if (schema == null) return McpToolInputSchema()
-
-        return try {
-            val obj = schema.jsonObject
-            val type = obj["type"]?.jsonPrimitive?.content ?: "object"
-            val properties = obj["properties"]?.jsonObject?.mapValues { (_, propValue) ->
-                val propObj = propValue.jsonObject
-                McpPropertySchema(
-                    type = propObj["type"]?.jsonPrimitive?.content ?: "string",
-                    description = propObj["description"]?.jsonPrimitive?.content,
-                    enum = propObj["enum"]?.jsonArray?.map { it.jsonPrimitive.content }
-                )
-            } ?: emptyMap()
-            val required = obj["required"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-
-            McpToolInputSchema(type, properties, required)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse input schema", e)
-            McpToolInputSchema()
         }
     }
 

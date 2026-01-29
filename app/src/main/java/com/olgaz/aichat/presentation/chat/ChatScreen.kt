@@ -106,8 +106,8 @@ import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationInfo
-import com.olgaz.aichat.domain.model.McpConnectionState
-import com.olgaz.aichat.presentation.chat.components.McpToolsPanel
+
+
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
 import com.olgaz.aichat.ui.theme.GradientDarkStart
 import com.olgaz.aichat.ui.theme.GradientLightEnd
@@ -151,7 +151,11 @@ fun ChatScreen(
     if (uiState.isSettingsDialogVisible) {
         SettingsDialog(
             settings = uiState.settings,
+            mcpConnectionState = uiState.mcpConnectionState,
+            mcpToolsCount = uiState.mcpTools.size,
             onSettingsChange = viewModel::updateSettings,
+            onConnectMcp = viewModel::connectToMcp,
+            onDisconnectMcp = viewModel::disconnectMcp,
             onDismiss = viewModel::hideSettingsDialog
         )
     }
@@ -281,17 +285,6 @@ fun ChatScreen(
             if (uiState.showSummaryButton && !uiState.isLoading && !uiState.isSummarizing) {
                 SummaryRequestButton(
                     onClick = viewModel::triggerManualSummarization
-                )
-            }
-
-            // MCP Tools Panel
-            if (uiState.settings.mcpEnabled) {
-                McpToolsPanel(
-                    connectionState = uiState.mcpConnectionState,
-                    tools = uiState.mcpTools,
-                    onConnect = viewModel::connectToMcp,
-                    onDisconnect = viewModel::disconnectMcp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 

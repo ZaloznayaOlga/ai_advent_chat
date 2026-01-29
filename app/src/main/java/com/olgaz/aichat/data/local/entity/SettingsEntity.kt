@@ -48,6 +48,12 @@ data class SettingsEntity(
     @ColumnInfo(name = "mcp_enabled", defaultValue = "0")
     val mcpEnabled: Boolean = false,
 
+    @ColumnInfo(name = "mcp_weather_enabled", defaultValue = "0")
+    val mcpWeatherEnabled: Boolean = false,
+
+    @ColumnInfo(name = "mcp_reminder_enabled", defaultValue = "0")
+    val mcpReminderEnabled: Boolean = false,
+
     @ColumnInfo(name = "mcp_server_url", defaultValue = "")
     val mcpServerUrl: String = ""
 )

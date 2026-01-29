@@ -1,0 +1,235 @@
+package com.olgaz.aichat.mcptools.reminder
+
+import com.olgaz.aichat.domain.model.McpContent
+import com.olgaz.aichat.domain.model.McpPropertySchema
+import com.olgaz.aichat.domain.model.McpTool
+import com.olgaz.aichat.domain.model.McpToolCallResult
+import com.olgaz.aichat.domain.model.McpToolInputSchema
+import com.olgaz.aichat.domain.repository.LocalToolHandler
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class ReminderToolHandler @Inject constructor(
+    private val reminderDao: ReminderDao
+) : LocalToolHandler {
+
+    companion object {
+        private const val TOOL_CREATE = "create_reminder"
+        private const val TOOL_LIST = "list_reminders"
+        private const val TOOL_COMPLETE = "complete_reminder"
+        private const val TOOL_DELETE = "delete_reminder"
+
+        private val TOOL_NAMES = setOf(TOOL_CREATE, TOOL_LIST, TOOL_COMPLETE, TOOL_DELETE)
+    }
+
+    override fun getTools(): List<McpTool> = listOf(
+        McpTool(
+            name = TOOL_CREATE,
+            description = "Создать новое напоминание или задачу. Используй этот инструмент когда пользователь просит создать, добавить или запомнить напоминание/задачу.",
+            inputSchema = McpToolInputSchema(
+                type = "object",
+                properties = mapOf(
+                    "text" to McpPropertySchema(
+                        type = "string",
+                        description = "Текст напоминания или задачи"
+                    ),
+                    "interval_minutes" to McpPropertySchema(
+                        type = "integer",
+                        description = "Интервал повторения в минутах (необязательно). Если указан, напоминание будет повторяющимся."
+                    )
+                ),
+                required = listOf("text")
+            )
+        ),
+        McpTool(
+            name = TOOL_LIST,
+            description = "Получить список напоминаний/задач пользователя. Используй этот инструмент когда пользователь спрашивает о своих напоминаниях, задачах или делах.",
+            inputSchema = McpToolInputSchema(
+                type = "object",
+                properties = mapOf(
+                    "status" to McpPropertySchema(
+                        type = "string",
+                        description = "Фильтр по статусу: active (активные), completed (выполненные), all (все). По умолчанию active.",
+                        enum = listOf("active", "completed", "all")
+                    )
+                )
+            )
+        ),
+        McpTool(
+            name = TOOL_COMPLETE,
+            description = "Отметить напоминание/задачу как выполненное. Используй когда пользователь просит отметить, завершить или выполнить напоминание.",
+            inputSchema = McpToolInputSchema(
+                type = "object",
+                properties = mapOf(
+                    "id" to McpPropertySchema(
+                        type = "integer",
+                        description = "ID напоминания для отметки выполненным"
+                    )
+                ),
+                required = listOf("id")
+            )
+        ),
+        McpTool(
+            name = TOOL_DELETE,
+            description = "Удалить напоминание/задачу. Используй когда пользователь просит удалить или убрать напоминание.",
+            inputSchema = McpToolInputSchema(
+                type = "object",
+                properties = mapOf(
+                    "id" to McpPropertySchema(
+                        type = "integer",
+                        description = "ID напоминания для удаления"
+                    )
+                ),
+                required = listOf("id")
+            )
+        )
+    )
+
+    override fun canHandle(toolName: String): Boolean = toolName in TOOL_NAMES
+
+    override suspend fun handleToolCall(
+        toolName: String,
+        arguments: Map<String, Any?>
+    ): McpToolCallResult {
+        return try {
+            when (toolName) {
+                TOOL_CREATE -> handleCreate(arguments)
+                TOOL_LIST -> handleList(arguments)
+                TOOL_COMPLETE -> handleComplete(arguments)
+                TOOL_DELETE -> handleDelete(arguments)
+                else -> McpToolCallResult.Error(
+                    toolName = toolName,
+                    message = "Неизвестный инструмент: $toolName"
+                )
+            }
+        } catch (e: Exception) {
+            McpToolCallResult.Error(
+                toolName = toolName,
+                message = "Ошибка выполнения инструмента: ${e.message}"
+            )
+        }
+    }
+
+    private suspend fun handleCreate(arguments: Map<String, Any?>): McpToolCallResult {
+        val text = arguments["text"]?.toString()
+            ?: return McpToolCallResult.Error(
+                toolName = TOOL_CREATE,
+                message = "Не указан текст напоминания"
+            )
+
+        val intervalMinutes = arguments["interval_minutes"]?.toString()?.toIntOrNull()
+
+        val entity = ReminderEntity(
+            text = text,
+            intervalMinutes = intervalMinutes,
+            createdAt = System.currentTimeMillis()
+        )
+
+        val id = reminderDao.insert(entity)
+
+        val response = buildString {
+            append("Напоминание создано (ID: $id): \"$text\"")
+            if (intervalMinutes != null) {
+                append(". Повторяется каждые $intervalMinutes мин.")
+            }
+        }
+
+        return McpToolCallResult.Success(
+            toolName = TOOL_CREATE,
+            content = listOf(McpContent.Text(response))
+        )
+    }
+
+    private suspend fun handleList(arguments: Map<String, Any?>): McpToolCallResult {
+        val status = arguments["status"]?.toString() ?: "active"
+
+        val reminders = when (status) {
+            "completed" -> reminderDao.getCompletedReminders()
+            "all" -> reminderDao.getAllReminders()
+            else -> reminderDao.getActiveReminders()
+        }
+
+        if (reminders.isEmpty()) {
+            val statusText = when (status) {
+                "completed" -> "выполненных"
+                "all" -> ""
+                else -> "активных"
+            }
+            return McpToolCallResult.Success(
+                toolName = TOOL_LIST,
+                content = listOf(McpContent.Text("Нет ${statusText} напоминаний."))
+            )
+        }
+
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+
+        val response = buildString {
+            append("Напоминания (${reminders.size}):\n")
+            reminders.forEach { r ->
+                val statusIcon = if (r.isCompleted) "✅" else "📌"
+                append("$statusIcon ID:${r.id} — ${r.text}")
+                if (r.intervalMinutes != null) {
+                    append(" [каждые ${r.intervalMinutes} мин.]")
+                }
+                append(" (создано: ${dateFormat.format(Date(r.createdAt))})")
+                if (r.isCompleted && r.completedAt != null) {
+                    append(" (выполнено: ${dateFormat.format(Date(r.completedAt))})")
+                }
+                append("\n")
+            }
+        }
+
+        return McpToolCallResult.Success(
+            toolName = TOOL_LIST,
+            content = listOf(McpContent.Text(response.trimEnd()))
+        )
+    }
+
+    private suspend fun handleComplete(arguments: Map<String, Any?>): McpToolCallResult {
+        val id = arguments["id"]?.toString()?.toLongOrNull()
+            ?: return McpToolCallResult.Error(
+                toolName = TOOL_COMPLETE,
+                message = "Не указан ID напоминания"
+            )
+
+        val updated = reminderDao.markCompleted(id, System.currentTimeMillis())
+
+        return if (updated > 0) {
+            McpToolCallResult.Success(
+                toolName = TOOL_COMPLETE,
+                content = listOf(McpContent.Text("Напоминание ID:$id отмечено как выполненное."))
+            )
+        } else {
+            McpToolCallResult.Error(
+                toolName = TOOL_COMPLETE,
+                message = "Напоминание с ID:$id не найдено."
+            )
+        }
+    }
+
+    private suspend fun handleDelete(arguments: Map<String, Any?>): McpToolCallResult {
+        val id = arguments["id"]?.toString()?.toLongOrNull()
+            ?: return McpToolCallResult.Error(
+                toolName = TOOL_DELETE,
+                message = "Не указан ID напоминания"
+            )
+
+        val deleted = reminderDao.delete(id)
+
+        return if (deleted > 0) {
+            McpToolCallResult.Success(
+                toolName = TOOL_DELETE,
+                content = listOf(McpContent.Text("Напоминание ID:$id удалено."))
+            )
+        } else {
+            McpToolCallResult.Error(
+                toolName = TOOL_DELETE,
+                message = "Напоминание с ID:$id не найдено."
+            )
+        }
+    }
+}

@@ -1,13 +1,17 @@
 package com.olgaz.aichat.presentation.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,6 +50,7 @@ import com.olgaz.aichat.domain.model.AiModel
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
+import com.olgaz.aichat.domain.model.McpConnectionState
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationSettings
@@ -55,7 +60,11 @@ import com.olgaz.aichat.domain.model.SystemPromptMode
 @Composable
 fun SettingsDialog(
     settings: ChatSettings,
+    mcpConnectionState: McpConnectionState,
+    mcpToolsCount: Int,
     onSettingsChange: (ChatSettings) -> Unit,
+    onConnectMcp: () -> Unit,
+    onDisconnectMcp: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -245,44 +254,20 @@ fun SettingsDialog(
                         )
                     }
 
-                    // MCP Settings
-                    SwitchSettingItem(
-                        label = "MCP Tools",
-                        description = "Model Context Protocol для вызова инструментов",
-                        checked = localSettings.mcpEnabled,
-                        onCheckedChange = { enabled ->
-                            localSettings = localSettings.copy(mcpEnabled = enabled)
-                        }
+                    // MCP Tools Section
+                    McpToolsSection(
+                        weatherEnabled = localSettings.mcpWeatherEnabled,
+                        reminderEnabled = localSettings.mcpReminderEnabled,
+                        onWeatherChange = { enabled ->
+                            localSettings = localSettings.copy(mcpWeatherEnabled = enabled)
+                            if (enabled) onConnectMcp() else onDisconnectMcp()
+                        },
+                        onReminderChange = { enabled ->
+                            localSettings = localSettings.copy(mcpReminderEnabled = enabled)
+                        },
+                        connectionState = mcpConnectionState,
+                        toolsCount = mcpToolsCount
                     )
-
-                    if (localSettings.mcpEnabled) {
-                        Column {
-                            Text(
-                                text = "MCP Server URL",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            OutlinedTextField(
-                                value = localSettings.mcpServerUrl,
-                                onValueChange = { url ->
-                                    localSettings = localSettings.copy(mcpServerUrl = url)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("http://localhost:3000/mcp") },
-                                singleLine = true
-                            )
-
-                            Text(
-                                text = "Оставьте пустым для использования URL из конфигурации",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
 
                     SwitchSettingItem(
                         label = "Отправка по Shift+Enter",
@@ -434,6 +419,112 @@ private fun SwitchSettingItem(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled
+        )
+    }
+}
+
+@Composable
+private fun McpToolsSection(
+    weatherEnabled: Boolean,
+    reminderEnabled: Boolean,
+    onWeatherChange: (Boolean) -> Unit,
+    onReminderChange: (Boolean) -> Unit,
+    connectionState: McpConnectionState,
+    toolsCount: Int
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "MCP Tools",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        SwitchSettingItem(
+            label = "Погода",
+            checked = weatherEnabled,
+            onCheckedChange = onWeatherChange
+        )
+        if (weatherEnabled) {
+            McpServerConnectionStatus(
+                connectionState = connectionState,
+                toolsCount = toolsCount
+            )
+        }
+
+        SwitchSettingItem(
+            label = "Напоминатель",
+            checked = reminderEnabled,
+            onCheckedChange = onReminderChange
+        )
+        if (reminderEnabled) {
+            McpLocalToolStatus()
+        }
+    }
+}
+
+@Composable
+private fun McpServerConnectionStatus(
+    connectionState: McpConnectionState,
+    toolsCount: Int
+) {
+    val statusColor = when (connectionState) {
+        is McpConnectionState.Connected -> Color(0xFF4CAF50)
+        is McpConnectionState.Connecting -> Color(0xFFFF9800)
+        is McpConnectionState.Disconnected -> Color.Gray
+        is McpConnectionState.Error -> Color(0xFFF44336)
+    }
+
+    val statusText = when (connectionState) {
+        is McpConnectionState.Connected -> "подключено ($toolsCount tools)"
+        is McpConnectionState.Connecting -> "подключение..."
+        is McpConnectionState.Disconnected -> "отключено"
+        is McpConnectionState.Error -> "ошибка"
+    }
+
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(statusColor, CircleShape)
+            )
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodySmall,
+                color = statusColor
+            )
+        }
+
+        if (connectionState is McpConnectionState.Error) {
+            Text(
+                text = connectionState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 16.dp, top = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun McpLocalToolStatus() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(start = 16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(Color(0xFF4CAF50), CircleShape)
+        )
+        Text(
+            text = "включено",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF4CAF50)
         )
     }
 }

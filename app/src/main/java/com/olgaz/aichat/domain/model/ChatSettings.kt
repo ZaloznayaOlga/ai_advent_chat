@@ -104,6 +104,9 @@ data class ChatSettings(
     val customSystemPrompt: String = "",
     val temperature: Float = 1.0f,
     val summarization: SummarizationSettings = SummarizationSettings(),
-    val mcpEnabled: Boolean = false,
+    val mcpWeatherEnabled: Boolean = false,
+    val mcpReminderEnabled: Boolean = false,
     val mcpServerUrl: String = ""
-)
+) {
+    val mcpEnabled: Boolean get() = mcpWeatherEnabled || mcpReminderEnabled
+}

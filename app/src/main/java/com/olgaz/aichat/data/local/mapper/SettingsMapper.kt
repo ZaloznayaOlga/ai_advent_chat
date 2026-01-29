@@ -27,7 +27,9 @@ object SettingsMapper {
             summarizationEnabled = settings.summarization.enabled,
             summarizationMessageThreshold = settings.summarization.messageThreshold,
             summarizationTokenThreshold = settings.summarization.tokenThreshold,
-            mcpEnabled = settings.mcpEnabled,
+            mcpEnabled = settings.mcpWeatherEnabled,
+            mcpWeatherEnabled = settings.mcpWeatherEnabled,
+            mcpReminderEnabled = settings.mcpReminderEnabled,
             mcpServerUrl = settings.mcpServerUrl
         )
     }
@@ -84,7 +86,8 @@ object SettingsMapper {
                 messageThreshold = entity.summarizationMessageThreshold,
                 tokenThreshold = entity.summarizationTokenThreshold
             ),
-            mcpEnabled = entity.mcpEnabled,
+            mcpWeatherEnabled = entity.mcpWeatherEnabled,
+            mcpReminderEnabled = entity.mcpReminderEnabled,
             mcpServerUrl = entity.mcpServerUrl
         )
     }
