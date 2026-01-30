@@ -6,6 +6,7 @@ import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.McpToolCallResult
 import com.olgaz.aichat.domain.model.McpToolInputSchema
 import com.olgaz.aichat.domain.repository.LocalToolHandler
+import com.olgaz.aichat.notification.ReminderScheduler
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -14,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ReminderToolHandler @Inject constructor(
-    private val reminderDao: ReminderDao
+    private val reminderDao: ReminderDao,
+    private val reminderScheduler: ReminderScheduler
 ) : LocalToolHandler {
 
     companion object {
@@ -41,6 +43,10 @@ class ReminderToolHandler @Inject constructor(
                     "interval_minutes" to McpPropertySchema(
                         type = "integer",
                         description = "Интервал повторения в минутах (необязательно). Если указан, напоминание будет повторяющимся."
+                    ),
+                    "reminder_time" to McpPropertySchema(
+                        type = "string",
+                        description = "Дата и время напоминания в формате ISO 8601 (например, 2025-01-30T15:00:00). Необязательно."
                     )
                 ),
                 required = listOf("text")
@@ -132,16 +138,26 @@ class ReminderToolHandler @Inject constructor(
 
         val intervalMinutes = arguments["interval_minutes"]?.toString()?.toIntOrNull()
 
+        val reminderTime = arguments["reminder_time"]?.toString()?.let { timeStr ->
+            parseReminderTime(timeStr)
+        }
+
         val entity = ReminderEntity(
             text = text,
             intervalMinutes = intervalMinutes,
+            reminderTime = reminderTime,
             createdAt = System.currentTimeMillis()
         )
 
         val id = reminderDao.insert(entity)
+        reminderScheduler.onReminderCreated(id, reminderTime)
 
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         val response = buildString {
             append("Напоминание создано (ID: $id): \"$text\"")
+            if (reminderTime != null) {
+                append(". Время: ${dateFormat.format(Date(reminderTime))}")
+            }
             if (intervalMinutes != null) {
                 append(". Повторяется каждые $intervalMinutes мин.")
             }
@@ -151,6 +167,44 @@ class ReminderToolHandler @Inject constructor(
             toolName = TOOL_CREATE,
             content = listOf(McpContent.Text(response))
         )
+    }
+
+    private fun parseReminderTime(timeStr: String): Long? {
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm",
+            "dd.MM.yyyy HH:mm",
+            "HH:mm"
+        )
+
+        for (format in formats) {
+            try {
+                val sdf = SimpleDateFormat(format, Locale.getDefault())
+                val date = sdf.parse(timeStr)
+                if (date != null) {
+                    // If only time was parsed (HH:mm), set today's date
+                    if (format == "HH:mm") {
+                        val now = java.util.Calendar.getInstance()
+                        val parsed = java.util.Calendar.getInstance().apply { time = date }
+                        now.set(java.util.Calendar.HOUR_OF_DAY, parsed.get(java.util.Calendar.HOUR_OF_DAY))
+                        now.set(java.util.Calendar.MINUTE, parsed.get(java.util.Calendar.MINUTE))
+                        now.set(java.util.Calendar.SECOND, 0)
+                        now.set(java.util.Calendar.MILLISECOND, 0)
+                        // If the time has already passed today, set it for tomorrow
+                        if (now.timeInMillis <= System.currentTimeMillis()) {
+                            now.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                        }
+                        return now.timeInMillis
+                    }
+                    return date.time
+                }
+            } catch (_: Exception) {
+                // Try next format
+            }
+        }
+        return null
     }
 
     private suspend fun handleList(arguments: Map<String, Any?>): McpToolCallResult {
@@ -181,6 +235,9 @@ class ReminderToolHandler @Inject constructor(
             reminders.forEach { r ->
                 val statusIcon = if (r.isCompleted) "✅" else "📌"
                 append("$statusIcon ID:${r.id} — ${r.text}")
+                if (r.reminderTime != null) {
+                    append(" [время: ${dateFormat.format(Date(r.reminderTime))}]")
+                }
                 if (r.intervalMinutes != null) {
                     append(" [каждые ${r.intervalMinutes} мин.]")
                 }
@@ -208,6 +265,7 @@ class ReminderToolHandler @Inject constructor(
         val updated = reminderDao.markCompleted(id, System.currentTimeMillis())
 
         return if (updated > 0) {
+            reminderScheduler.onReminderCompleted(id)
             McpToolCallResult.Success(
                 toolName = TOOL_COMPLETE,
                 content = listOf(McpContent.Text("Напоминание ID:$id отмечено как выполненное."))
@@ -230,6 +288,7 @@ class ReminderToolHandler @Inject constructor(
         val deleted = reminderDao.delete(id)
 
         return if (deleted > 0) {
+            reminderScheduler.onReminderCompleted(id)
             McpToolCallResult.Success(
                 toolName = TOOL_DELETE,
                 content = listOf(McpContent.Text("Напоминание ID:$id удалено."))
@@ -244,6 +303,10 @@ class ReminderToolHandler @Inject constructor(
 
     private suspend fun handleDeleteAll(): McpToolCallResult {
         val deleted = reminderDao.deleteAll()
+
+        if (deleted > 0) {
+            reminderScheduler.onAllRemindersDeleted()
+        }
 
         return McpToolCallResult.Success(
             toolName = TOOL_DELETE_ALL,

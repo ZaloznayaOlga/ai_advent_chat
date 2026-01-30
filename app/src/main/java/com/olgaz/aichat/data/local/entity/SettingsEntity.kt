@@ -55,5 +55,8 @@ data class SettingsEntity(
     val mcpReminderEnabled: Boolean = false,
 
     @ColumnInfo(name = "mcp_server_url", defaultValue = "")
-    val mcpServerUrl: String = ""
+    val mcpServerUrl: String = "",
+
+    @ColumnInfo(name = "reminder_check_interval_minutes", defaultValue = "30")
+    val reminderCheckIntervalMinutes: Int = 30
 )

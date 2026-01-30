@@ -27,7 +27,6 @@ import com.olgaz.aichat.domain.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -35,6 +34,8 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import android.util.Log
+import com.olgaz.aichat.di.DateTimeTool
+import com.olgaz.aichat.di.ReminderTool
 import retrofit2.HttpException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -48,7 +49,8 @@ class ChatRepositoryImpl @Inject constructor(
     @HuggingFaceApi private val huggingFaceApi: ChatApi,
     private val systemPromptProvider: SystemPromptProvider,
     private val mcpRepository: McpRepository,
-    private val localToolHandler: LocalToolHandler
+    @ReminderTool private val reminderToolHandler: LocalToolHandler,
+    @DateTimeTool private val dateTimeToolHandler: LocalToolHandler
 ) : ChatRepository {
 
     private val json = Json {
@@ -157,8 +159,15 @@ class ChatRepositoryImpl @Inject constructor(
         settings: ChatSettings,
         mcpTools: List<McpTool>
     ): Flow<Result<Message>> = flow {
-        // Если нет MCP tools и reminder выключен, используем обычную отправку
-        if (mcpTools.isEmpty() && !settings.mcpReminderEnabled) {
+        // Собираем все tools: MCP (внешние) + локальные
+        val allTools = mcpTools.toMutableList()
+        allTools.addAll(dateTimeToolHandler.getTools())
+        if (settings.mcpReminderEnabled) {
+            allTools.addAll(reminderToolHandler.getTools())
+        }
+
+        // Если инструментов нет вообще, используем обычную отправку
+        if (allTools.isEmpty()) {
             sendMessage(messages, settings).collect { emit(it) }
             return@flow
         }
@@ -178,11 +187,6 @@ class ChatRepositoryImpl @Inject constructor(
                 )
             }
 
-            // Собираем все tools: MCP (внешние) + локальные (reminder)
-            val allTools = mcpTools.toMutableList()
-            if (settings.mcpReminderEnabled) {
-                allTools.addAll(localToolHandler.getTools())
-            }
             val toolDtos = allTools.map { it.toToolDto() }
 
             val api = selectApi(settings.provider)
@@ -296,9 +300,15 @@ class ChatRepositoryImpl @Inject constructor(
                     }
 
                     // Вызываем tool: локальный или MCP
-                    val toolResult = if (localToolHandler.canHandle(toolName)) {
+                    val toolResult = if (dateTimeToolHandler.canHandle(toolName)) {
                         try {
-                            Result.success(localToolHandler.handleToolCall(toolName, arguments))
+                            Result.success(dateTimeToolHandler.handleToolCall(toolName, arguments))
+                        } catch (e: Exception) {
+                            Result.failure(e)
+                        }
+                    } else if (reminderToolHandler.canHandle(toolName)) {
+                        try {
+                            Result.success(reminderToolHandler.handleToolCall(toolName, arguments))
                         } catch (e: Exception) {
                             Result.failure(e)
                         }

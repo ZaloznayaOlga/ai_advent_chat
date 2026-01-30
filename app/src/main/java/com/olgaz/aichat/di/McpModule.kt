@@ -2,6 +2,10 @@ package com.olgaz.aichat.di
 
 import com.olgaz.aichat.data.repository.McpRepositoryImpl
 import com.olgaz.aichat.domain.repository.McpRepository
+import com.olgaz.aichat.mcptools.datetime.DateTimeToolHandler
+import com.olgaz.aichat.mcptools.reminder.ReminderDao
+import com.olgaz.aichat.mcptools.reminder.ReminderToolHandler
+import com.olgaz.aichat.notification.ReminderScheduler
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
@@ -258,12 +259,16 @@ fun SettingsDialog(
                     McpToolsSection(
                         weatherEnabled = localSettings.mcpWeatherEnabled,
                         reminderEnabled = localSettings.mcpReminderEnabled,
+                        reminderCheckIntervalMinutes = localSettings.reminderCheckIntervalMinutes,
                         onWeatherChange = { enabled ->
                             localSettings = localSettings.copy(mcpWeatherEnabled = enabled)
                             if (enabled) onConnectMcp() else onDisconnectMcp()
                         },
                         onReminderChange = { enabled ->
                             localSettings = localSettings.copy(mcpReminderEnabled = enabled)
+                        },
+                        onReminderIntervalChange = { interval ->
+                            localSettings = localSettings.copy(reminderCheckIntervalMinutes = interval)
                         },
                         connectionState = mcpConnectionState,
                         toolsCount = mcpToolsCount
@@ -427,8 +432,10 @@ private fun SwitchSettingItem(
 private fun McpToolsSection(
     weatherEnabled: Boolean,
     reminderEnabled: Boolean,
+    reminderCheckIntervalMinutes: Int,
     onWeatherChange: (Boolean) -> Unit,
     onReminderChange: (Boolean) -> Unit,
+    onReminderIntervalChange: (Int) -> Unit,
     connectionState: McpConnectionState,
     toolsCount: Int
 ) {
@@ -458,6 +465,39 @@ private fun McpToolsSection(
         )
         if (reminderEnabled) {
             McpLocalToolStatus()
+            ReminderIntervalSelector(
+                selectedInterval = reminderCheckIntervalMinutes,
+                onIntervalChange = onReminderIntervalChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReminderIntervalSelector(
+    selectedInterval: Int,
+    onIntervalChange: (Int) -> Unit
+) {
+    val intervals = listOf(15, 30, 60)
+    val labels = listOf("15 мин", "30 мин", "1 час")
+
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        Text(
+            text = "Интервал проверки",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            intervals.forEachIndexed { index, interval ->
+                FilterChip(
+                    selected = selectedInterval == interval,
+                    onClick = { onIntervalChange(interval) },
+                    label = { Text(labels[index]) }
+                )
+            }
         }
     }
 }

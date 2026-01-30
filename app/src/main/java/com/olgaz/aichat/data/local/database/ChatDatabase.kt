@@ -15,7 +15,7 @@ import com.olgaz.aichat.mcptools.reminder.ReminderEntity
 
 @Database(
     entities = [MessageEntity::class, SettingsEntity::class, ReminderEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -55,6 +55,14 @@ abstract class ChatDatabase : RoomDatabase() {
                         completed_at INTEGER
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reminders ADD COLUMN reminder_time INTEGER")
+                db.execSQL("ALTER TABLE reminders ADD COLUMN is_notified INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE settings ADD COLUMN reminder_check_interval_minutes INTEGER NOT NULL DEFAULT 30")
             }
         }
     }

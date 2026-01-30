@@ -21,6 +21,7 @@ import com.olgaz.aichat.domain.usecase.mcp.ConnectMcpUseCase
 import com.olgaz.aichat.domain.usecase.mcp.DisconnectMcpUseCase
 import com.olgaz.aichat.domain.usecase.mcp.GetMcpToolsUseCase
 import com.olgaz.aichat.domain.usecase.mcp.ObserveMcpConnectionUseCase
+import com.olgaz.aichat.notification.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,8 @@ class ChatViewModel @Inject constructor(
     private val disconnectMcpUseCase: DisconnectMcpUseCase,
     private val getMcpToolsUseCase: GetMcpToolsUseCase,
     private val callMcpToolUseCase: CallMcpToolUseCase,
-    private val observeMcpConnectionUseCase: ObserveMcpConnectionUseCase
+    private val observeMcpConnectionUseCase: ObserveMcpConnectionUseCase,
+    private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -336,10 +338,26 @@ class ChatViewModel @Inject constructor(
     }
 
     fun updateSettings(settings: ChatSettings) {
+        val oldSettings = _uiState.value.settings
         _uiState.update { it.copy(settings = settings) }
         viewModelScope.launch {
             try {
                 chatHistoryRepository.saveSettings(settings)
+
+                // Re-schedule worker if reminder interval changed
+                if (oldSettings.reminderCheckIntervalMinutes != settings.reminderCheckIntervalMinutes) {
+                    reminderScheduler.schedulePeriodicCheck(settings.reminderCheckIntervalMinutes)
+                }
+
+                // If reminders were just disabled, cancel the worker
+                if (oldSettings.mcpReminderEnabled && !settings.mcpReminderEnabled) {
+                    reminderScheduler.cancelPeriodicCheck()
+                }
+
+                // If reminders were just enabled, schedule the worker
+                if (!oldSettings.mcpReminderEnabled && settings.mcpReminderEnabled) {
+                    reminderScheduler.schedulePeriodicCheck(settings.reminderCheckIntervalMinutes)
+                }
             } catch (e: Exception) {
                 // Ignore save errors - settings are still in memory
             }

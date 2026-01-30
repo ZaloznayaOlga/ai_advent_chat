@@ -30,7 +30,8 @@ object SettingsMapper {
             mcpEnabled = settings.mcpWeatherEnabled,
             mcpWeatherEnabled = settings.mcpWeatherEnabled,
             mcpReminderEnabled = settings.mcpReminderEnabled,
-            mcpServerUrl = settings.mcpServerUrl
+            mcpServerUrl = settings.mcpServerUrl,
+            reminderCheckIntervalMinutes = settings.reminderCheckIntervalMinutes
         )
     }
 
@@ -88,6 +89,7 @@ object SettingsMapper {
             ),
             mcpWeatherEnabled = entity.mcpWeatherEnabled,
             mcpReminderEnabled = entity.mcpReminderEnabled,
+            reminderCheckIntervalMinutes = entity.reminderCheckIntervalMinutes,
             mcpServerUrl = entity.mcpServerUrl
         )
     }

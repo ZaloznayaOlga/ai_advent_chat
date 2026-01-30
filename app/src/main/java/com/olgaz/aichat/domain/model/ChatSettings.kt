@@ -106,6 +106,7 @@ data class ChatSettings(
     val summarization: SummarizationSettings = SummarizationSettings(),
     val mcpWeatherEnabled: Boolean = false,
     val mcpReminderEnabled: Boolean = false,
+    val reminderCheckIntervalMinutes: Int = 30,
     val mcpServerUrl: String = ""
 ) {
     val mcpEnabled: Boolean get() = mcpWeatherEnabled || mcpReminderEnabled
