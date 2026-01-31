@@ -58,5 +58,11 @@ data class SettingsEntity(
     val mcpServerUrl: String = "",
 
     @ColumnInfo(name = "reminder_check_interval_minutes", defaultValue = "30")
-    val reminderCheckIntervalMinutes: Int = 30
+    val reminderCheckIntervalMinutes: Int = 30,
+
+    @ColumnInfo(name = "weather_cities", defaultValue = "[]")
+    val weatherCities: String = "[]",
+
+    @ColumnInfo(name = "selected_weather_city", defaultValue = "Москва")
+    val selectedWeatherCity: String = "Москва"
 )

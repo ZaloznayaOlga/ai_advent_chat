@@ -179,6 +179,18 @@ class McpRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun reconnect(): Result<Unit> = withContext(Dispatchers.IO) {
+        val config = currentConfig
+        if (config == null) {
+            Log.w(TAG, "Cannot reconnect: no previous config")
+            return@withContext Result.failure(IllegalStateException("Нет сохранённой конфигурации для переподключения"))
+        }
+
+        Log.i(TAG, "Reconnecting to MCP server: ${config.url}")
+        disconnect()
+        connect(config)
+    }
+
     override suspend fun ping(): Result<Boolean> = withContext(Dispatchers.IO) {
         val client = mcpClient ?: return@withContext Result.success(false)
         try {

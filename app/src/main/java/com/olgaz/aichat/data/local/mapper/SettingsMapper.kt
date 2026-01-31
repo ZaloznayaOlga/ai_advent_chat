@@ -9,6 +9,8 @@ import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationSettings
 import com.olgaz.aichat.domain.model.SystemPromptMode
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 
 object SettingsMapper {
 
@@ -31,7 +33,9 @@ object SettingsMapper {
             mcpWeatherEnabled = settings.mcpWeatherEnabled,
             mcpReminderEnabled = settings.mcpReminderEnabled,
             mcpServerUrl = settings.mcpServerUrl,
-            reminderCheckIntervalMinutes = settings.reminderCheckIntervalMinutes
+            reminderCheckIntervalMinutes = settings.reminderCheckIntervalMinutes,
+            weatherCities = Json.encodeToString(settings.weatherCities),
+            selectedWeatherCity = settings.selectedWeatherCity
         )
     }
 
@@ -90,7 +94,14 @@ object SettingsMapper {
             mcpWeatherEnabled = entity.mcpWeatherEnabled,
             mcpReminderEnabled = entity.mcpReminderEnabled,
             reminderCheckIntervalMinutes = entity.reminderCheckIntervalMinutes,
-            mcpServerUrl = entity.mcpServerUrl
+            mcpServerUrl = entity.mcpServerUrl,
+            weatherCities = try {
+                Json.decodeFromString<List<String>>(entity.weatherCities)
+                    .ifEmpty { ChatSettings().weatherCities }
+            } catch (e: Exception) {
+                ChatSettings().weatherCities
+            },
+            selectedWeatherCity = entity.selectedWeatherCity.ifBlank { "Москва" }
         )
     }
 }

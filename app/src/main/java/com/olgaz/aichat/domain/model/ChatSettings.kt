@@ -78,7 +78,7 @@ enum class SystemPromptMode(val displayName: String) {
  * Суммаризация срабатывает при превышении ЛЮБОГО порога (OR логика).
  */
 data class SummarizationSettings(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val messageThreshold: Int = 10,
     val tokenThreshold: Int = 10_000
 ) {
@@ -104,10 +104,12 @@ data class ChatSettings(
     val customSystemPrompt: String = "",
     val temperature: Float = 1.0f,
     val summarization: SummarizationSettings = SummarizationSettings(),
-    val mcpWeatherEnabled: Boolean = false,
-    val mcpReminderEnabled: Boolean = false,
+    val mcpWeatherEnabled: Boolean = true,
+    val mcpReminderEnabled: Boolean = true,
     val reminderCheckIntervalMinutes: Int = 30,
-    val mcpServerUrl: String = ""
+    val mcpServerUrl: String = "",
+    val weatherCities: List<String> = listOf("Москва", "Санкт-Петербург", "Новосибирск"),
+    val selectedWeatherCity: String = "Москва"
 ) {
     val mcpEnabled: Boolean get() = mcpWeatherEnabled || mcpReminderEnabled
 }

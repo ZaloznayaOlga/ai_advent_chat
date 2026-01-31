@@ -35,6 +35,8 @@ class ReminderNotificationHelper @Inject constructor(
         const val NOTIFICATION_ID_FOREGROUND = 1001
         const val NOTIFICATION_ID_SUMMARY = 1002
         const val NOTIFICATION_ID_URGENT_BASE = 2000
+
+        const val EXTRA_FROM_REMINDER_SUMMARY = "extra_from_reminder_summary"
     }
 
     fun createNotificationChannels() {
@@ -96,9 +98,11 @@ class ReminderNotificationHelper @Inject constructor(
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_FROM_REMINDER_SUMMARY, true)
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, 1, intent, PendingIntent.FLAG_IMMUTABLE
+            context, 1, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_REMINDER_SUMMARY)

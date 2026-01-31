@@ -42,6 +42,11 @@ interface McpRepository {
     ): Result<McpToolCallResult>
 
     /**
+     * Переподключиться к MCP серверу используя последнюю конфигурацию
+     */
+    suspend fun reconnect(): Result<Unit>
+
+    /**
      * Проверить доступность сервера
      */
     suspend fun ping(): Result<Boolean>

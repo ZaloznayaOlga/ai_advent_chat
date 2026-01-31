@@ -15,7 +15,7 @@ import com.olgaz.aichat.mcptools.reminder.ReminderEntity
 
 @Database(
     entities = [MessageEntity::class, SettingsEntity::class, ReminderEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -63,6 +63,13 @@ abstract class ChatDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE reminders ADD COLUMN reminder_time INTEGER")
                 db.execSQL("ALTER TABLE reminders ADD COLUMN is_notified INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE settings ADD COLUMN reminder_check_interval_minutes INTEGER NOT NULL DEFAULT 30")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE settings ADD COLUMN weather_cities TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE settings ADD COLUMN selected_weather_city TEXT NOT NULL DEFAULT 'Москва'")
             }
         }
     }

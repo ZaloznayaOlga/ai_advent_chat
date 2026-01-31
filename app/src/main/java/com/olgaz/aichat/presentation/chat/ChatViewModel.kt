@@ -89,11 +89,10 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val savedSettings = chatHistoryRepository.getSettings()
-                if (savedSettings != null) {
-                    _uiState.update { it.copy(settings = savedSettings) }
-                    if (savedSettings.mcpWeatherEnabled) {
-                        connectToMcp()
-                    }
+                val settings = savedSettings ?: ChatSettings()
+                _uiState.update { it.copy(settings = settings) }
+                if (settings.mcpWeatherEnabled) {
+                    connectToMcp()
                 }
 
                 val messages = chatHistoryRepository.getAllMessagesOnce()
@@ -430,5 +429,24 @@ class ChatViewModel @Inject constructor(
 
     fun clearAttachedFile() {
         _uiState.update { it.copy(attachedFile = null) }
+    }
+
+    fun reloadMessages() {
+        viewModelScope.launch {
+            try {
+                val messages = chatHistoryRepository.getAllMessagesOnce()
+                _uiState.update {
+                    it.copy(
+                        messages = messages,
+                        showSummaryButton = messages.isNotEmpty() &&
+                            messages.lastOrNull()?.summarizationInfo == null
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(error = "Ошибка загрузки сообщений: ${e.message}")
+                }
+            }
+        }
     }
 }

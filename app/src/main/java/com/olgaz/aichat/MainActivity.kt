@@ -1,6 +1,7 @@
 package com.olgaz.aichat
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -9,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import com.olgaz.aichat.notification.ReminderNotificationHelper
 import com.olgaz.aichat.presentation.chat.ChatScreen
 import com.olgaz.aichat.presentation.chat.ChatViewModel
 import com.olgaz.aichat.ui.theme.AIChatTheme
@@ -30,11 +32,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         requestNotificationPermissionIfNeeded()
+        handleReminderSummaryIntent(intent)
 
         setContent {
             AIChatTheme {
                 ChatScreen(viewModel = viewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleReminderSummaryIntent(intent)
+    }
+
+    private fun handleReminderSummaryIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(
+                ReminderNotificationHelper.EXTRA_FROM_REMINDER_SUMMARY, false
+            ) == true
+        ) {
+            viewModel.reloadMessages()
+            intent.removeExtra(ReminderNotificationHelper.EXTRA_FROM_REMINDER_SUMMARY)
         }
     }
 

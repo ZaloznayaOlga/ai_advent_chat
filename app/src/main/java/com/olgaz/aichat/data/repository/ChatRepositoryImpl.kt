@@ -173,7 +173,13 @@ class ChatRepositoryImpl @Inject constructor(
         }
 
         try {
-            val systemPrompt = systemPromptProvider.getSystemPrompt(settings)
+            val basePrompt = systemPromptProvider.getSystemPrompt(settings)
+            val toolInstructions = buildToolInstructions(allTools, settings)
+            val systemPrompt = if (toolInstructions.isNotEmpty()) {
+                "$basePrompt\n\n$toolInstructions"
+            } else {
+                basePrompt
+            }
             val systemMessage = MessageDto(role = "system", content = systemPrompt)
 
             val userMessages = messages.map { message ->
@@ -313,7 +319,25 @@ class ChatRepositoryImpl @Inject constructor(
                             Result.failure(e)
                         }
                     } else {
-                        mcpRepository.callTool(toolName, arguments)
+                        // Вызываем MCP tool с автоматическим переподключением при сбое
+                        val firstAttempt = mcpRepository.callTool(toolName, arguments)
+                        if (firstAttempt.isFailure) {
+                            Log.w(TAG, "MCP tool call failed, attempting reconnect...")
+                            val reconnectResult = mcpRepository.reconnect()
+                            if (reconnectResult.isSuccess) {
+                                mcpRepository.callTool(toolName, arguments)
+                            } else {
+                                Result.success(
+                                    McpToolCallResult.Error(
+                                        toolName = toolName,
+                                        message = "Не удалось получить данные от MCP сервера. Сервер недоступен.",
+                                        isRetryable = false
+                                    )
+                                )
+                            }
+                        } else {
+                            firstAttempt
+                        }
                     }
                     val toolContent = when (val result = toolResult.getOrNull()) {
                         is McpToolCallResult.Success -> {
@@ -518,6 +542,50 @@ class ChatRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             emit(Result.failure(ApiException("Ошибка суммаризации: ${e.localizedMessage}")))
         }
+    }
+
+    private fun buildToolInstructions(
+        tools: List<McpTool>,
+        settings: ChatSettings
+    ): String {
+        val toolNames = tools.map { it.name }
+        val hasReminderTools = toolNames.any { it.startsWith("create_reminder") || it.startsWith("list_reminder") || it.startsWith("complete_reminder") || it.startsWith("delete_reminder") || it == "delete_all_reminders" }
+        val hasDateTimeTool = "get_current_datetime" in toolNames
+
+        val sb = StringBuilder()
+        sb.appendLine("## Инструкции по использованию инструментов")
+        sb.appendLine()
+        sb.appendLine("У тебя есть доступ к инструментам (tools/functions). КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА:")
+        sb.appendLine("- ВСЕГДА используй соответствующий инструмент для выполнения действий. НИКОГДА не отвечай текстом, что ты выполнил действие, без реального вызова инструмента.")
+        sb.appendLine("- Если пользователь просит выполнить действие, для которого есть инструмент — ОБЯЗАТЕЛЬНО вызови этот инструмент.")
+        sb.appendLine("- НЕ имитируй результат инструмента текстом. Только реальный вызов инструмента выполняет действие.")
+
+        if (hasReminderTools) {
+            sb.appendLine()
+            sb.appendLine("### Работа с напоминаниями и задачами")
+            sb.appendLine("- Для создания напоминаний/задач — ВСЕГДА вызывай инструмент `create_reminder`.")
+            sb.appendLine("- Для просмотра списка задач — ВСЕГДА вызывай инструмент `list_reminders`.")
+            sb.appendLine("- Для отметки выполнения — ВСЕГДА вызывай `complete_reminder`.")
+            sb.appendLine("- Для удаления — ВСЕГДА вызывай `delete_reminder` или `delete_all_reminders`.")
+            sb.appendLine("- НИКОГДА не говори пользователю, что задача создана/удалена/выполнена, если ты не вызвал соответствующий инструмент.")
+        }
+
+        if (hasDateTimeTool) {
+            sb.appendLine()
+            sb.appendLine("### Работа с датой и временем")
+            sb.appendLine("- Если тебе нужно узнать текущую дату или время (например, для расчёта \"завтра\", \"через час\" и т.д.), СНАЧАЛА вызови инструмент `get_current_datetime`.")
+            sb.appendLine("- НЕ угадывай текущую дату — всегда используй инструмент `get_current_datetime` для получения актуальной информации.")
+        }
+
+        val hasWeatherTool = toolNames.any { it.contains("weather", ignoreCase = true) }
+        if (hasWeatherTool && settings.selectedWeatherCity.isNotBlank()) {
+            sb.appendLine()
+            sb.appendLine("### Работа с погодой")
+            sb.appendLine("- Город пользователя по умолчанию: ${settings.selectedWeatherCity}")
+            sb.appendLine("- Если пользователь спрашивает о погоде без указания города, используй город: ${settings.selectedWeatherCity}")
+        }
+
+        return sb.toString().trim()
     }
 
     private fun selectApi(provider: AiProvider): ChatApi = when (provider) {

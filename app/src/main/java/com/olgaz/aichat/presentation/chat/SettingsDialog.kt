@@ -271,7 +271,18 @@ fun SettingsDialog(
                             localSettings = localSettings.copy(reminderCheckIntervalMinutes = interval)
                         },
                         connectionState = mcpConnectionState,
-                        toolsCount = mcpToolsCount
+                        toolsCount = mcpToolsCount,
+                        weatherCities = localSettings.weatherCities,
+                        selectedWeatherCity = localSettings.selectedWeatherCity,
+                        onCitySelected = { city ->
+                            localSettings = localSettings.copy(selectedWeatherCity = city)
+                        },
+                        onCityAdded = { newCity ->
+                            localSettings = localSettings.copy(
+                                weatherCities = localSettings.weatherCities + newCity,
+                                selectedWeatherCity = newCity
+                            )
+                        }
                     )
 
                     SwitchSettingItem(
@@ -437,7 +448,11 @@ private fun McpToolsSection(
     onReminderChange: (Boolean) -> Unit,
     onReminderIntervalChange: (Int) -> Unit,
     connectionState: McpConnectionState,
-    toolsCount: Int
+    toolsCount: Int,
+    weatherCities: List<String>,
+    selectedWeatherCity: String,
+    onCitySelected: (String) -> Unit,
+    onCityAdded: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
@@ -456,6 +471,12 @@ private fun McpToolsSection(
                 connectionState = connectionState,
                 toolsCount = toolsCount
             )
+            WeatherCitySelector(
+                cities = weatherCities,
+                selectedCity = selectedWeatherCity,
+                onCitySelected = onCitySelected,
+                onCityAdded = onCityAdded
+            )
         }
 
         SwitchSettingItem(
@@ -469,6 +490,110 @@ private fun McpToolsSection(
                 selectedInterval = reminderCheckIntervalMinutes,
                 onIntervalChange = onReminderIntervalChange
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeatherCitySelector(
+    cities: List<String>,
+    selectedCity: String,
+    onCitySelected: (String) -> Unit,
+    onCityAdded: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showAddField by remember { mutableStateOf(false) }
+    var newCityText by remember { mutableStateOf("") }
+
+    val addOptionLabel = "Добавить..."
+
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        Text(
+            text = "Город",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = selectedCity,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                cities.forEach { city ->
+                    DropdownMenuItem(
+                        text = { Text(city) },
+                        onClick = {
+                            onCitySelected(city)
+                            expanded = false
+                        }
+                    )
+                }
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = addOptionLabel,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        showAddField = true
+                        newCityText = ""
+                    }
+                )
+            }
+        }
+
+        if (showAddField) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = newCityText,
+                    onValueChange = { newCityText = it },
+                    placeholder = { Text("Название города") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+
+                Button(
+                    onClick = {
+                        val trimmed = newCityText.trim()
+                        if (trimmed.isNotEmpty() && trimmed !in cities) {
+                            onCityAdded(trimmed)
+                            showAddField = false
+                            newCityText = ""
+                        }
+                    },
+                    enabled = newCityText.trim().isNotEmpty()
+                ) {
+                    Text("OK")
+                }
+            }
         }
     }
 }
