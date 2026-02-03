@@ -40,7 +40,10 @@ object MessageMapper {
                     summarizedOutputTokens = it.summarizedOutputTokens
                 )
             },
-            isSummary = message.summarizationInfo != null
+            isSummary = message.summarizationInfo != null,
+            usedTools = if (message.usedTools.isNotEmpty()) {
+                json.encodeToString(message.usedTools)
+            } else null
         )
     }
 
@@ -66,7 +69,10 @@ object MessageMapper {
                     summarizedInputTokens = it.summarizedInputTokens,
                     summarizedOutputTokens = it.summarizedOutputTokens
                 )
-            }
+            },
+            usedTools = entity.usedTools?.let {
+                json.decodeFromString<List<String>>(it)
+            } ?: emptyList()
         )
     }
 }

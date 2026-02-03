@@ -208,7 +208,7 @@ class ChatRepositoryImpl @Inject constructor(
 
             // Цикл tool calling (максимум 5 итераций для безопасности)
             var iterations = 0
-            val maxIterations = 5
+            val maxIterations = 10
 
             while (iterations < maxIterations) {
                 iterations++

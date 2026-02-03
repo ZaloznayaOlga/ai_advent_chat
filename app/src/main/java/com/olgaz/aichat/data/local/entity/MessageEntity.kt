@@ -35,7 +35,10 @@ data class MessageEntity(
     val isSummary: Boolean = false,
 
     @ColumnInfo(name = "covered_by_summary_id")
-    val coveredBySummaryId: String? = null
+    val coveredBySummaryId: String? = null,
+
+    @ColumnInfo(name = "used_tools")
+    val usedTools: String? = null
 )
 
 data class FileAttachmentEmbedded(

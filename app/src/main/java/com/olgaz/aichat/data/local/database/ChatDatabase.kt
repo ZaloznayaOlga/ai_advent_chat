@@ -15,7 +15,7 @@ import com.olgaz.aichat.mcptools.reminder.ReminderEntity
 
 @Database(
     entities = [MessageEntity::class, SettingsEntity::class, ReminderEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -70,6 +70,12 @@ abstract class ChatDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE settings ADD COLUMN weather_cities TEXT NOT NULL DEFAULT '[]'")
                 db.execSQL("ALTER TABLE settings ADD COLUMN selected_weather_city TEXT NOT NULL DEFAULT 'Москва'")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN used_tools TEXT")
             }
         }
     }
