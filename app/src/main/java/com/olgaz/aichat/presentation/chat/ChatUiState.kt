@@ -4,6 +4,8 @@ import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.McpConnectionState
 import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.Message
+import com.olgaz.aichat.domain.model.RagConnectionState
+import com.olgaz.aichat.domain.model.RagDocument
 
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
@@ -17,7 +19,13 @@ data class ChatUiState(
     val isReadingFile: Boolean = false,
     val showSummaryButton: Boolean = false,
     val mcpConnectionState: McpConnectionState = McpConnectionState.Disconnected,
-    val mcpTools: List<McpTool> = emptyList()
+    val mcpTools: List<McpTool> = emptyList(),
+    val ragConnectionState: RagConnectionState = RagConnectionState.Disconnected,
+    val ragDocuments: List<RagDocument> = emptyList(),
+    val isUploadingRagDocument: Boolean = false,
+    val showRagDocumentsDialog: Boolean = false,
+    val showRagAddDocumentDialog: Boolean = false,
+    val ragError: String? = null
 )
 
 data class AttachedFileInfo(

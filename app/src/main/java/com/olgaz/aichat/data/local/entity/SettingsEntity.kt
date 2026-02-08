@@ -64,5 +64,11 @@ data class SettingsEntity(
     val weatherCities: String = "[]",
 
     @ColumnInfo(name = "selected_weather_city", defaultValue = "Москва")
-    val selectedWeatherCity: String = "Москва"
+    val selectedWeatherCity: String = "Москва",
+
+    @ColumnInfo(name = "rag_enabled", defaultValue = "0")
+    val ragEnabled: Boolean = false,
+
+    @ColumnInfo(name = "rag_server_url", defaultValue = "http://10.0.2.2:8000")
+    val ragServerUrl: String = "http://10.0.2.2:8000"
 )

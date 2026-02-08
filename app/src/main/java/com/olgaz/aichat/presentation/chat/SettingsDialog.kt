@@ -52,10 +52,13 @@ import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
 import com.olgaz.aichat.domain.model.McpConnectionState
+import com.olgaz.aichat.domain.model.RagConnectionState
+import com.olgaz.aichat.domain.model.RagDocument
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationSettings
 import com.olgaz.aichat.domain.model.SystemPromptMode
+import com.olgaz.aichat.presentation.chat.components.RagSection
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -63,9 +66,14 @@ fun SettingsDialog(
     settings: ChatSettings,
     mcpConnectionState: McpConnectionState,
     mcpToolsCount: Int,
+    ragConnectionState: RagConnectionState,
+    ragDocuments: List<RagDocument>,
     onSettingsChange: (ChatSettings) -> Unit,
     onConnectMcp: () -> Unit,
     onDisconnectMcp: () -> Unit,
+    onCheckRagHealth: () -> Unit,
+    onShowRagAddDialog: () -> Unit,
+    onShowRagDocumentsDialog: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -254,6 +262,19 @@ fun SettingsDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    // RAG Section
+                    RagSection(
+                        ragEnabled = localSettings.ragEnabled,
+                        onRagEnabledChange = { enabled ->
+                            localSettings = localSettings.copy(ragEnabled = enabled)
+                            if (enabled) onCheckRagHealth()
+                        },
+                        ragConnectionState = ragConnectionState,
+                        ragDocumentsCount = ragDocuments.size,
+                        onAddDocuments = onShowRagAddDialog,
+                        onShowDocuments = onShowRagDocumentsDialog
+                    )
 
                     // MCP Tools Section
                     McpToolsSection(

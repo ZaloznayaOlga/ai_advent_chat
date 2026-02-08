@@ -15,7 +15,7 @@ import com.olgaz.aichat.mcptools.reminder.ReminderEntity
 
 @Database(
     entities = [MessageEntity::class, SettingsEntity::class, ReminderEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -76,6 +76,13 @@ abstract class ChatDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN used_tools TEXT")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE settings ADD COLUMN rag_enabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE settings ADD COLUMN rag_server_url TEXT NOT NULL DEFAULT 'http://10.0.2.2:8000'")
             }
         }
     }

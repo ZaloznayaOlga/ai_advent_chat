@@ -36,6 +36,7 @@ android {
         buildConfigField("String", "HUGGINGFACE_API_KEY", "\"${localProperties.getProperty("HUGGINGFACE_API_KEY", "")}\"")
         buildConfigField("String", "HUGGINGFACE_BASE_URL", "\"https://router.huggingface.co/v1/\"")
         buildConfigField("String", "MCP_SERVER_URL", "\"${localProperties.getProperty("MCP_SERVER_URL", "")}\"")
+        buildConfigField("String", "RAG_SERVER_URL", "\"${localProperties.getProperty("RAG_SERVER_URL", "")}\"")
 
     }
 

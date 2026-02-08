@@ -24,6 +24,7 @@ import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import com.olgaz.aichat.domain.repository.ChatRepository
 import com.olgaz.aichat.domain.repository.LocalToolHandler
 import com.olgaz.aichat.domain.repository.McpRepository
+import com.olgaz.aichat.domain.repository.RagRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -49,6 +50,7 @@ class ChatRepositoryImpl @Inject constructor(
     @HuggingFaceApi private val huggingFaceApi: ChatApi,
     private val systemPromptProvider: SystemPromptProvider,
     private val mcpRepository: McpRepository,
+    private val ragRepository: RagRepository,
     @ReminderTool private val reminderToolHandler: LocalToolHandler,
     @DateTimeTool private val dateTimeToolHandler: LocalToolHandler
 ) : ChatRepository {
@@ -175,12 +177,40 @@ class ChatRepositoryImpl @Inject constructor(
         try {
             val basePrompt = systemPromptProvider.getSystemPrompt(settings)
             val toolInstructions = buildToolInstructions(allTools, settings)
-            val systemPrompt = if (toolInstructions.isNotEmpty()) {
-                "$basePrompt\n\n$toolInstructions"
-            } else {
-                basePrompt
+
+            // RAG Integration: поиск релевантного контекста
+            val ragContext = if (settings.ragEnabled) {
+                val lastUserMsg = messages.lastOrNull { it.role == MessageRole.USER }
+                lastUserMsg?.let { msg ->
+                    try {
+                        ragRepository.search(msg.content, 5).getOrNull()?.let { response ->
+                            if (response.results.isNotEmpty()) {
+                                Log.d(TAG, "RAG found ${response.results.size} relevant chunks")
+                                response.results.joinToString("\n\n") { result ->
+                                    "[Источник: ${result.documentName}]\n${result.text}"
+                                }
+                            } else null
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "RAG search failed", e)
+                        null
+                    }
+                }
+            } else null
+
+            // Формируем системный промпт с RAG контекстом
+            val systemPromptWithRag = buildString {
+                append(basePrompt)
+                if (toolInstructions.isNotEmpty()) {
+                    append("\n\n")
+                    append(toolInstructions)
+                }
+                if (ragContext != null) {
+                    append("\n\n## Контекст из базы знаний:\n")
+                    append(ragContext)
+                }
             }
-            val systemMessage = MessageDto(role = "system", content = systemPrompt)
+            val systemMessage = MessageDto(role = "system", content = systemPromptWithRag)
 
             val userMessages = messages.map { message ->
                 MessageDto(
@@ -205,6 +235,11 @@ class ChatRepositoryImpl @Inject constructor(
 
             // Список использованных tools
             val usedToolNames = mutableListOf<String>()
+
+            // Добавляем RAG в список использованных инструментов если контекст был найден
+            if (ragContext != null) {
+                usedToolNames.add("RAG")
+            }
 
             // Цикл tool calling (максимум 5 итераций для безопасности)
             var iterations = 0

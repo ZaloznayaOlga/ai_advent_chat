@@ -106,6 +106,8 @@ import com.olgaz.aichat.domain.model.MessageRole
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationInfo
+import com.olgaz.aichat.presentation.chat.components.RagAddDocumentDialog
+import com.olgaz.aichat.presentation.chat.components.RagDocumentsDialog
 
 
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
@@ -153,10 +155,32 @@ fun ChatScreen(
             settings = uiState.settings,
             mcpConnectionState = uiState.mcpConnectionState,
             mcpToolsCount = uiState.mcpTools.size,
+            ragConnectionState = uiState.ragConnectionState,
+            ragDocuments = uiState.ragDocuments,
             onSettingsChange = viewModel::updateSettings,
             onConnectMcp = viewModel::connectToMcp,
             onDisconnectMcp = viewModel::disconnectMcp,
+            onCheckRagHealth = viewModel::checkRagHealth,
+            onShowRagAddDialog = viewModel::showRagAddDocumentDialog,
+            onShowRagDocumentsDialog = viewModel::showRagDocumentsDialog,
             onDismiss = viewModel::hideSettingsDialog
+        )
+    }
+
+    if (uiState.showRagDocumentsDialog) {
+        RagDocumentsDialog(
+            documents = uiState.ragDocuments,
+            onDeleteDocument = viewModel::deleteRagDocument,
+            onDismiss = viewModel::hideRagDocumentsDialog
+        )
+    }
+
+    if (uiState.showRagAddDocumentDialog) {
+        RagAddDocumentDialog(
+            isUploading = uiState.isUploadingRagDocument,
+            error = uiState.ragError,
+            onUpload = viewModel::uploadRagDocuments,
+            onDismiss = viewModel::hideRagAddDocumentDialog
         )
     }
 

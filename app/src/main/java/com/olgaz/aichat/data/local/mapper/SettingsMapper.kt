@@ -35,7 +35,9 @@ object SettingsMapper {
             mcpServerUrl = settings.mcpServerUrl,
             reminderCheckIntervalMinutes = settings.reminderCheckIntervalMinutes,
             weatherCities = Json.encodeToString(settings.weatherCities),
-            selectedWeatherCity = settings.selectedWeatherCity
+            selectedWeatherCity = settings.selectedWeatherCity,
+            ragEnabled = settings.ragEnabled,
+            ragServerUrl = settings.ragServerUrl
         )
     }
 
@@ -101,7 +103,9 @@ object SettingsMapper {
             } catch (e: Exception) {
                 ChatSettings().weatherCities
             },
-            selectedWeatherCity = entity.selectedWeatherCity.ifBlank { "Москва" }
+            selectedWeatherCity = entity.selectedWeatherCity.ifBlank { "Москва" },
+            ragEnabled = entity.ragEnabled,
+            ragServerUrl = entity.ragServerUrl.ifBlank { "http://10.0.2.2:8000" }
         )
     }
 }

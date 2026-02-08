@@ -109,7 +109,9 @@ data class ChatSettings(
     val reminderCheckIntervalMinutes: Int = 30,
     val mcpServerUrl: String = "",
     val weatherCities: List<String> = listOf("Москва", "Санкт-Петербург", "Новосибирск"),
-    val selectedWeatherCity: String = "Москва"
+    val selectedWeatherCity: String = "Москва",
+    val ragEnabled: Boolean = false,
+    val ragServerUrl: String = "http://10.0.2.2:8000"
 ) {
     val mcpEnabled: Boolean get() = mcpWeatherEnabled || mcpReminderEnabled
 }

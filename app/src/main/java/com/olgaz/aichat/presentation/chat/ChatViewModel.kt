@@ -21,6 +21,11 @@ import com.olgaz.aichat.domain.usecase.mcp.ConnectMcpUseCase
 import com.olgaz.aichat.domain.usecase.mcp.DisconnectMcpUseCase
 import com.olgaz.aichat.domain.usecase.mcp.GetMcpToolsUseCase
 import com.olgaz.aichat.domain.usecase.mcp.ObserveMcpConnectionUseCase
+import com.olgaz.aichat.domain.usecase.rag.CheckRagHealthUseCase
+import com.olgaz.aichat.domain.usecase.rag.DeleteRagDocumentUseCase
+import com.olgaz.aichat.domain.usecase.rag.GetRagDocumentsUseCase
+import com.olgaz.aichat.domain.usecase.rag.ObserveRagConnectionUseCase
+import com.olgaz.aichat.domain.usecase.rag.UploadRagDocumentUseCase
 import com.olgaz.aichat.notification.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,7 +46,12 @@ class ChatViewModel @Inject constructor(
     private val getMcpToolsUseCase: GetMcpToolsUseCase,
     private val callMcpToolUseCase: CallMcpToolUseCase,
     private val observeMcpConnectionUseCase: ObserveMcpConnectionUseCase,
-    private val reminderScheduler: ReminderScheduler
+    private val reminderScheduler: ReminderScheduler,
+    private val checkRagHealthUseCase: CheckRagHealthUseCase,
+    private val uploadRagDocumentUseCase: UploadRagDocumentUseCase,
+    private val getRagDocumentsUseCase: GetRagDocumentsUseCase,
+    private val deleteRagDocumentUseCase: DeleteRagDocumentUseCase,
+    private val observeRagConnectionUseCase: ObserveRagConnectionUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -50,6 +60,7 @@ class ChatViewModel @Inject constructor(
     init {
         loadSavedData()
         observeMcpState()
+        observeRagState()
     }
 
     private fun observeMcpState() {
@@ -63,6 +74,79 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(mcpTools = tools) }
             }
         }
+    }
+
+    private fun observeRagState() {
+        viewModelScope.launch {
+            observeRagConnectionUseCase().collect { state ->
+                _uiState.update { it.copy(ragConnectionState = state) }
+            }
+        }
+        viewModelScope.launch {
+            getRagDocumentsUseCase().collect { docs ->
+                _uiState.update { it.copy(ragDocuments = docs) }
+            }
+        }
+    }
+
+    fun checkRagHealth() {
+        viewModelScope.launch {
+            checkRagHealthUseCase()
+        }
+    }
+
+    fun uploadRagDocuments(files: List<Pair<String, String>>) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingRagDocument = true, ragError = null) }
+
+            var successCount = 0
+            var lastError: String? = null
+
+            files.forEach { (name, content) ->
+                val result = uploadRagDocumentUseCase(name, content)
+                result.fold(
+                    onSuccess = { successCount++ },
+                    onFailure = { lastError = it.message }
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    isUploadingRagDocument = false,
+                    ragError = if (successCount < files.size) lastError else null,
+                    showRagAddDocumentDialog = if (successCount > 0) false else it.showRagAddDocumentDialog
+                )
+            }
+        }
+    }
+
+    fun deleteRagDocument(name: String) {
+        viewModelScope.launch {
+            deleteRagDocumentUseCase(name)
+        }
+    }
+
+    fun showRagDocumentsDialog() {
+        viewModelScope.launch {
+            getRagDocumentsUseCase.refresh()
+        }
+        _uiState.update { it.copy(showRagDocumentsDialog = true) }
+    }
+
+    fun hideRagDocumentsDialog() {
+        _uiState.update { it.copy(showRagDocumentsDialog = false) }
+    }
+
+    fun showRagAddDocumentDialog() {
+        _uiState.update { it.copy(showRagAddDocumentDialog = true, ragError = null) }
+    }
+
+    fun hideRagAddDocumentDialog() {
+        _uiState.update { it.copy(showRagAddDocumentDialog = false, ragError = null) }
+    }
+
+    fun clearRagError() {
+        _uiState.update { it.copy(ragError = null) }
     }
 
     fun connectToMcp() {
@@ -93,6 +177,9 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(settings = settings) }
                 if (settings.mcpWeatherEnabled) {
                     connectToMcp()
+                }
+                if (settings.ragEnabled) {
+                    checkRagHealth()
                 }
 
                 val messages = chatHistoryRepository.getAllMessagesOnce()
