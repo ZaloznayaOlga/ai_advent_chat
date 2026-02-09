@@ -19,6 +19,7 @@ import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageJsonData
 import com.olgaz.aichat.domain.model.MessageMetadata
 import com.olgaz.aichat.domain.model.MessageRole
+import com.olgaz.aichat.domain.model.RagSource
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.provider.SystemPromptProvider
 import com.olgaz.aichat.domain.repository.ChatRepository
@@ -179,6 +180,7 @@ class ChatRepositoryImpl @Inject constructor(
             val toolInstructions = buildToolInstructions(allTools, settings)
 
             // RAG Integration: поиск релевантного контекста
+            var ragSearchResults: List<RagSource> = emptyList()
             val ragContext = if (settings.ragEnabled) {
                 val lastUserMsg = messages.lastOrNull { it.role == MessageRole.USER }
                 lastUserMsg?.let { msg ->
@@ -186,6 +188,8 @@ class ChatRepositoryImpl @Inject constructor(
                         ragRepository.search(msg.content, 5).getOrNull()?.let { response ->
                             if (response.results.isNotEmpty()) {
                                 Log.d(TAG, "RAG found ${response.results.size} relevant chunks")
+                                // Сохраняем источники для передачи в сообщение
+                                ragSearchResults = response.results.map { RagSource.fromSearchResult(it) }
                                 response.results.joinToString("\n\n") { result ->
                                     "[Источник: ${result.documentName}]\n${result.text}"
                                 }
@@ -206,6 +210,8 @@ class ChatRepositoryImpl @Inject constructor(
                     append(toolInstructions)
                 }
                 if (ragContext != null) {
+                    append("\n\n")
+                    append(buildRagInstructions(ragSearchResults))
                     append("\n\n## Контекст из базы знаний:\n")
                     append(ragContext)
                 }
@@ -287,14 +293,15 @@ class ChatRepositoryImpl @Inject constructor(
                     )
 
                     val assistantMessage = when (settings.responseFormat) {
-                        ResponseFormat.JSON -> parseJsonResponse(rawContent, metadata, usedToolNames)
-                        ResponseFormat.XML -> parseXmlResponse(rawContent, metadata, usedToolNames)
+                        ResponseFormat.JSON -> parseJsonResponse(rawContent, metadata, usedToolNames, ragSearchResults)
+                        ResponseFormat.XML -> parseXmlResponse(rawContent, metadata, usedToolNames, ragSearchResults)
                         ResponseFormat.TEXT -> Message(
                             content = rawContent,
                             role = MessageRole.ASSISTANT,
                             timestamp = System.currentTimeMillis(),
                             metadata = metadata,
-                            usedTools = usedToolNames.toList()
+                            usedTools = usedToolNames.toList(),
+                            ragSources = ragSearchResults
                         )
                     }
 
@@ -579,6 +586,51 @@ class ChatRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Формирует инструкции для модели по использованию RAG и цитированию источников
+     */
+    private fun buildRagInstructions(ragSources: List<RagSource>): String {
+        val sourcesList = ragSources.mapIndexed { index, source ->
+            "[${index + 1}] ${source.documentName} (чанк ${source.chunkIndex + 1})"
+        }.joinToString("\n")
+
+        return """
+## КРИТИЧЕСКИ ВАЖНЫЕ ИНСТРУКЦИИ ПО ИСПОЛЬЗОВАНИЮ БАЗЫ ЗНАНИЙ (RAG)
+
+Тебе предоставлен контекст из базы знаний. Ты ОБЯЗАН следовать этим правилам:
+
+### 1. ПРИОРИТЕТ БАЗЫ ЗНАНИЙ
+- Информация из базы знаний имеет ВЫСШИЙ ПРИОРИТЕТ над твоими общими знаниями
+- Если в базе знаний есть релевантная информация — используй ЕЁ в первую очередь
+- Свои общие знания используй только для дополнения, если база знаний не содержит полного ответа
+
+### 2. ОБЯЗАТЕЛЬНОЕ ЦИТИРОВАНИЕ ИСТОЧНИКОВ
+- В КАЖДОМ ответе, где ты используешь информацию из базы знаний, ты ОБЯЗАН указать источники
+- Формат цитирования: в конце ответа добавь секцию "Источники:" со списком использованных документов
+- При прямом цитировании используй кавычки и указывай источник
+
+### 3. ФОРМАТ ОТВЕТА С ИСТОЧНИКАМИ
+Пример правильного ответа:
+```
+[Твой ответ на вопрос, основанный на информации из базы знаний]
+
+**Источники:**
+- [1] Название_документа.txt — «цитата из документа»
+- [2] Другой_документ.pdf — использована информация о...
+```
+
+### 4. ДОСТУПНЫЕ ИСТОЧНИКИ
+$sourcesList
+
+### 5. ЕСЛИ ИНФОРМАЦИИ НЕТ В БАЗЕ
+Если в предоставленном контексте НЕТ релевантной информации:
+- Честно сообщи, что в базе знаний нет информации по данному вопросу
+- Можешь предложить ответ на основе общих знаний, но ЯВНО укажи, что это НЕ из базы знаний
+
+ПОМНИ: Пользователь доверяет информации из базы знаний. Всегда указывай источники!
+""".trimIndent()
+    }
+
     private fun buildToolInstructions(
         tools: List<McpTool>,
         settings: ChatSettings
@@ -646,12 +698,13 @@ class ChatRepositoryImpl @Inject constructor(
     }
 
     private fun parseJsonResponse(rawContent: String, metadata: MessageMetadata): Message =
-        parseJsonResponse(rawContent, metadata, emptyList())
+        parseJsonResponse(rawContent, metadata, emptyList(), emptyList())
 
     private fun parseJsonResponse(
         rawContent: String,
         metadata: MessageMetadata,
-        usedTools: List<String>
+        usedTools: List<String>,
+        ragSources: List<RagSource> = emptyList()
     ): Message {
         return try {
             val cleanedJson = cleanJsonResponse(rawContent)
@@ -673,7 +726,8 @@ class ChatRepositoryImpl @Inject constructor(
                     responseFormat = ResponseFormat.JSON
                 ),
                 metadata = metadata,
-                usedTools = usedTools
+                usedTools = usedTools,
+                ragSources = ragSources
             )
         } catch (e: Exception) {
             Log.w(TAG, "JSON parsing failed, showing raw content", e)
@@ -683,18 +737,20 @@ class ChatRepositoryImpl @Inject constructor(
                 role = MessageRole.ASSISTANT,
                 timestamp = System.currentTimeMillis(),
                 metadata = metadata,
-                usedTools = usedTools
+                usedTools = usedTools,
+                ragSources = ragSources
             )
         }
     }
 
     private fun parseXmlResponse(rawContent: String, metadata: MessageMetadata): Message =
-        parseXmlResponse(rawContent, metadata, emptyList())
+        parseXmlResponse(rawContent, metadata, emptyList(), emptyList())
 
     private fun parseXmlResponse(
         rawContent: String,
         metadata: MessageMetadata,
-        usedTools: List<String>
+        usedTools: List<String>,
+        ragSources: List<RagSource> = emptyList()
     ): Message {
         return try {
             val cleanedXml = cleanXmlResponse(rawContent)
@@ -722,7 +778,8 @@ class ChatRepositoryImpl @Inject constructor(
                     responseFormat = ResponseFormat.XML
                 ),
                 metadata = metadata,
-                usedTools = usedTools
+                usedTools = usedTools,
+                ragSources = ragSources
             )
         } catch (e: Exception) {
             Log.w(TAG, "XML parsing failed, showing raw content", e)
@@ -732,7 +789,8 @@ class ChatRepositoryImpl @Inject constructor(
                 role = MessageRole.ASSISTANT,
                 timestamp = System.currentTimeMillis(),
                 metadata = metadata,
-                usedTools = usedTools
+                usedTools = usedTools,
+                ragSources = ragSources
             )
         }
     }

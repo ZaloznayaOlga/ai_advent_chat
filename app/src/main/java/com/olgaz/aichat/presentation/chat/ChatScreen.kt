@@ -108,6 +108,7 @@ import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationInfo
 import com.olgaz.aichat.presentation.chat.components.RagAddDocumentDialog
 import com.olgaz.aichat.presentation.chat.components.RagDocumentsDialog
+import com.olgaz.aichat.presentation.chat.components.RagSourcesSection
 
 
 import com.olgaz.aichat.ui.theme.GradientDarkEnd
@@ -410,6 +411,11 @@ private fun MessageItem(message: Message) {
         // Used MCP tools
         if (!isUser && message.usedTools.isNotEmpty()) {
             UsedToolsInfo(tools = message.usedTools)
+        }
+
+        // RAG Sources with citations
+        if (!isUser && message.ragSources.isNotEmpty()) {
+            RagSourcesSection(sources = message.ragSources)
         }
     }
 }

@@ -2,6 +2,7 @@ package com.olgaz.aichat.data.local.mapper
 
 import com.olgaz.aichat.data.local.converter.MessageJsonDataSerializable
 import com.olgaz.aichat.data.local.converter.MessageMetadataSerializable
+import com.olgaz.aichat.data.local.converter.RagSourceSerializable
 import com.olgaz.aichat.data.local.converter.toDomain
 import com.olgaz.aichat.data.local.converter.toSerializable
 import com.olgaz.aichat.data.local.entity.FileAttachmentEmbedded
@@ -43,6 +44,9 @@ object MessageMapper {
             isSummary = message.summarizationInfo != null,
             usedTools = if (message.usedTools.isNotEmpty()) {
                 json.encodeToString(message.usedTools)
+            } else null,
+            ragSources = if (message.ragSources.isNotEmpty()) {
+                json.encodeToString(message.ragSources.map { it.toSerializable() })
             } else null
         )
     }
@@ -72,6 +76,9 @@ object MessageMapper {
             },
             usedTools = entity.usedTools?.let {
                 json.decodeFromString<List<String>>(it)
+            } ?: emptyList(),
+            ragSources = entity.ragSources?.let {
+                json.decodeFromString<List<RagSourceSerializable>>(it).map { src -> src.toDomain() }
             } ?: emptyList()
         )
     }

@@ -52,3 +52,23 @@ data class RagRerankConfig(
         )
     }
 }
+
+/**
+ * Источник из RAG для отображения в сообщении.
+ * Сохраняется вместе с сообщением для отображения цитат и ссылок.
+ */
+data class RagSource(
+    val documentName: String,
+    val chunkIndex: Int,
+    val text: String,
+    val score: Double
+) {
+    companion object {
+        fun fromSearchResult(result: RagSearchResult): RagSource = RagSource(
+            documentName = result.documentName,
+            chunkIndex = result.chunkIndex,
+            text = result.text,
+            score = result.score
+        )
+    }
+}

@@ -13,7 +13,8 @@ data class Message(
     val attachedFile: FileAttachment? = null,
     val displayContent: String = content,
     val summarizationInfo: SummarizationInfo? = null,
-    val usedTools: List<String> = emptyList()
+    val usedTools: List<String> = emptyList(),
+    val ragSources: List<RagSource> = emptyList()
 )
 
 /**

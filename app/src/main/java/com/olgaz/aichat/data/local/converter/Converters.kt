@@ -103,3 +103,28 @@ fun MessageMetadataSerializable.toDomain() = MessageMetadata(
     provider = AiProvider.valueOf(provider),
     model = model?.let { AiModel.valueOf(it) }
 )
+
+/**
+ * Сериализуемая модель для RagSource (источники RAG для хранения в БД)
+ */
+@Serializable
+data class RagSourceSerializable(
+    val documentName: String,
+    val chunkIndex: Int,
+    val text: String,
+    val score: Double
+)
+
+fun com.olgaz.aichat.domain.model.RagSource.toSerializable() = RagSourceSerializable(
+    documentName = documentName,
+    chunkIndex = chunkIndex,
+    text = text,
+    score = score
+)
+
+fun RagSourceSerializable.toDomain() = com.olgaz.aichat.domain.model.RagSource(
+    documentName = documentName,
+    chunkIndex = chunkIndex,
+    text = text,
+    score = score
+)
