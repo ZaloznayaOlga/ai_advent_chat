@@ -4,13 +4,18 @@ import com.olgaz.aichat.data.remote.dto.AddDocumentRequestDto
 import com.olgaz.aichat.data.remote.dto.AddDocumentResponseDto
 import com.olgaz.aichat.data.remote.dto.DeleteResponseDto
 import com.olgaz.aichat.data.remote.dto.DocumentListResponseDto
+import com.olgaz.aichat.data.remote.dto.GetRerankConfigResponseDto
 import com.olgaz.aichat.data.remote.dto.HealthResponseDto
+import com.olgaz.aichat.data.remote.dto.ResetRerankConfigResponseDto
 import com.olgaz.aichat.data.remote.dto.SearchRequestDto
 import com.olgaz.aichat.data.remote.dto.SearchResponseDto
+import com.olgaz.aichat.data.remote.dto.UpdateRerankConfigRequestDto
+import com.olgaz.aichat.data.remote.dto.UpdateRerankConfigResponseDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface RagApi {
@@ -29,4 +34,13 @@ interface RagApi {
 
     @GET("api/health")
     suspend fun getHealth(): HealthResponseDto
+
+    @GET("api/config/rerank")
+    suspend fun getRerankConfig(): GetRerankConfigResponseDto
+
+    @PUT("api/config/rerank")
+    suspend fun updateRerankConfig(@Body request: UpdateRerankConfigRequestDto): UpdateRerankConfigResponseDto
+
+    @POST("api/config/rerank/reset")
+    suspend fun resetRerankConfig(): ResetRerankConfigResponseDto
 }

@@ -127,7 +127,8 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -149,23 +150,6 @@ fun ChatScreen(
     )
 
     val chatBackgroundColor = if (isDarkTheme) GreyDark else GreyLight
-
-    if (uiState.isSettingsDialogVisible) {
-        SettingsDialog(
-            settings = uiState.settings,
-            mcpConnectionState = uiState.mcpConnectionState,
-            mcpToolsCount = uiState.mcpTools.size,
-            ragConnectionState = uiState.ragConnectionState,
-            ragDocuments = uiState.ragDocuments,
-            onSettingsChange = viewModel::updateSettings,
-            onConnectMcp = viewModel::connectToMcp,
-            onDisconnectMcp = viewModel::disconnectMcp,
-            onCheckRagHealth = viewModel::checkRagHealth,
-            onShowRagAddDialog = viewModel::showRagAddDocumentDialog,
-            onShowRagDocumentsDialog = viewModel::showRagDocumentsDialog,
-            onDismiss = viewModel::hideSettingsDialog
-        )
-    }
 
     if (uiState.showRagDocumentsDialog) {
         RagDocumentsDialog(
@@ -238,7 +222,7 @@ fun ChatScreen(
                                 tint = if (hasMessages) Color.White else Color.White.copy(alpha = 0.4f)
                             )
                         }
-                        IconButton(onClick = { viewModel.showSettingsDialog() }) {
+                        IconButton(onClick = onNavigateToSettings) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Настройки",

@@ -35,3 +35,20 @@ data class RagSearchResponse(
     val query: String,
     val results: List<RagSearchResult>
 )
+
+/**
+ * Конфигурация реранкинга RAG
+ */
+data class RagRerankConfig(
+    val rerankingEnabled: Boolean,
+    val filteringEnabled: Boolean,
+    val minScore: Float
+) {
+    companion object {
+        val DEFAULT = RagRerankConfig(
+            rerankingEnabled = false,
+            filteringEnabled = false,
+            minScore = 0.0f
+        )
+    }
+}

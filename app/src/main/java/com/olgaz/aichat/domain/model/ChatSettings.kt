@@ -111,7 +111,10 @@ data class ChatSettings(
     val weatherCities: List<String> = listOf("Москва", "Санкт-Петербург", "Новосибирск"),
     val selectedWeatherCity: String = "Москва",
     val ragEnabled: Boolean = false,
-    val ragServerUrl: String = "http://10.0.2.2:8000"
+    val ragServerUrl: String = "http://10.0.2.2:8000",
+    val ragRerankingEnabled: Boolean = true,
+    val ragFilteringEnabled: Boolean = true,
+    val ragMinScore: Float = 0.5f
 ) {
     val mcpEnabled: Boolean get() = mcpWeatherEnabled || mcpReminderEnabled
 }

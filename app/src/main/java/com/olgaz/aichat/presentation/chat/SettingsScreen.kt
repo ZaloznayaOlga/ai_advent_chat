@@ -1,11 +1,13 @@
 package com.olgaz.aichat.presentation.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,357 +17,385 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.material3.Button
 import com.olgaz.aichat.domain.model.AiModel
 import com.olgaz.aichat.domain.model.AiProvider
 import com.olgaz.aichat.domain.model.ChatSettings
 import com.olgaz.aichat.domain.model.CommunicationStyle
 import com.olgaz.aichat.domain.model.McpConnectionState
 import com.olgaz.aichat.domain.model.RagConnectionState
-import com.olgaz.aichat.domain.model.RagDocument
 import com.olgaz.aichat.domain.model.ResponseFormat
 import com.olgaz.aichat.domain.model.SendMessageMode
 import com.olgaz.aichat.domain.model.SummarizationSettings
 import com.olgaz.aichat.domain.model.SystemPromptMode
+import com.olgaz.aichat.presentation.chat.components.RagAddDocumentDialog
+import com.olgaz.aichat.presentation.chat.components.RagDocumentsDialog
 import com.olgaz.aichat.presentation.chat.components.RagSection
+import com.olgaz.aichat.presentation.chat.components.RagSettingsDialog
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsDialog(
-    settings: ChatSettings,
-    mcpConnectionState: McpConnectionState,
-    mcpToolsCount: Int,
-    ragConnectionState: RagConnectionState,
-    ragDocuments: List<RagDocument>,
-    onSettingsChange: (ChatSettings) -> Unit,
-    onConnectMcp: () -> Unit,
-    onDisconnectMcp: () -> Unit,
-    onCheckRagHealth: () -> Unit,
-    onShowRagAddDialog: () -> Unit,
-    onShowRagDocumentsDialog: () -> Unit,
-    onDismiss: () -> Unit
+fun SettingsScreen(
+    viewModel: ChatViewModel,
+    onNavigateBack: () -> Unit
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
-    var localSettings by remember { mutableStateOf(settings) }
+    var localSettings by remember { mutableStateOf(uiState.settings) }
     val defaultSettings = ChatSettings()
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
+    val hasChanges = localSettings != uiState.settings
+
+    val handleBack: () -> Unit = {
+        keyboardController?.hide()
+        if (hasChanges) {
+            viewModel.updateSettings(localSettings)
+        }
+        onNavigateBack()
+    }
+
+    BackHandler(onBack = handleBack)
+
+    if (uiState.showRagDocumentsDialog) {
+        RagDocumentsDialog(
+            documents = uiState.ragDocuments,
+            onDeleteDocument = viewModel::deleteRagDocument,
+            onDismiss = viewModel::hideRagDocumentsDialog
+        )
+    }
+
+    if (uiState.showRagAddDocumentDialog) {
+        RagAddDocumentDialog(
+            isUploading = uiState.isUploadingRagDocument,
+            error = uiState.ragError,
+            onUpload = viewModel::uploadRagDocuments,
+            onDismiss = viewModel::hideRagAddDocumentDialog
+        )
+    }
+
+    if (uiState.showRagSettingsDialog) {
+        RagSettingsDialog(
+            rerankConfig = uiState.ragRerankConfig,
+            isLoading = uiState.isLoadingRagConfig,
+            isSaving = uiState.isSavingRagConfig,
+            documents = uiState.ragDocuments,
+            onConfigChange = viewModel::updateRagRerankConfig,
+            onResetConfig = viewModel::resetRagRerankConfig,
+            onAddDocuments = viewModel::showRagAddDocumentDialog,
+            onDeleteDocument = viewModel::deleteRagDocument,
+            onDismiss = viewModel::hideRagSettingsDialog
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Настройки",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = handleBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                SettingsHeader(onDismiss = onDismiss)
+                DropdownSettingItem(
+                    label = "Провайдер AI",
+                    selectedValue = localSettings.provider.displayName,
+                    options = AiProvider.entries.map { it.displayName },
+                    onOptionSelected = { displayName ->
+                        val provider = AiProvider.entries.first { it.displayName == displayName }
+                        val defaultModel = AiModel.defaultForProvider(provider)
+                        localSettings = localSettings.copy(
+                            provider = provider,
+                            model = defaultModel
+                        )
+                    }
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                DropdownSettingItem(
+                    label = "Модель",
+                    selectedValue = localSettings.model.displayName,
+                    options = AiModel.forProvider(localSettings.provider).map { it.displayName },
+                    onOptionSelected = { displayName ->
+                        val model = AiModel.entries.first {
+                            it.displayName == displayName && it.provider == localSettings.provider
+                        }
+                        localSettings = localSettings.copy(model = model)
+                    }
+                )
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                DropdownSettingItem(
+                    label = "Стиль общения",
+                    selectedValue = localSettings.communicationStyle.displayName,
+                    options = CommunicationStyle.entries.map { it.displayName },
+                    onOptionSelected = { displayName ->
+                        val style = CommunicationStyle.entries.first { it.displayName == displayName }
+                        localSettings = localSettings.copy(communicationStyle = style)
+                    }
+                )
+
+                SwitchSettingItem(
+                    label = "Глубокое мышление",
+                    description = when (localSettings.provider) {
+                        AiProvider.DEEPSEEK -> "Использует deepseek-reasoner"
+                        AiProvider.OPENAI -> "Использует o1-preview"
+                        AiProvider.HUGGINGFACE -> "Недоступно для HuggingFace"
+                    },
+                    checked = localSettings.deepThinking,
+                    onCheckedChange = { enabled ->
+                        localSettings = localSettings.copy(deepThinking = enabled)
+                    },
+                    enabled = localSettings.provider != AiProvider.HUGGINGFACE
+                )
+
+                SliderSettingItem(
+                    label = "Температура",
+                    value = localSettings.temperature,
+                    onValueChange = { newTemp ->
+                        localSettings = localSettings.copy(temperature = newTemp)
+                    },
+                    valueRange = 0f..1.5f,
+                    steps = 14
+                )
+
+                if (localSettings.systemPromptMode != SystemPromptMode.CUSTOM) {
                     DropdownSettingItem(
-                        label = "Провайдер AI",
-                        selectedValue = localSettings.provider.displayName,
-                        options = AiProvider.entries.map { it.displayName },
+                        label = "Формат ответа",
+                        selectedValue = localSettings.responseFormat.displayName,
+                        options = ResponseFormat.entries.map { it.displayName },
                         onOptionSelected = { displayName ->
-                            val provider = AiProvider.entries.first { it.displayName == displayName }
-                            val defaultModel = AiModel.defaultForProvider(provider)
+                            val format = ResponseFormat.entries.first { it.displayName == displayName }
+                            localSettings = localSettings.copy(responseFormat = format)
+                        }
+                    )
+                }
+
+                DropdownSettingItem(
+                    label = "Системный промпт",
+                    selectedValue = localSettings.systemPromptMode.displayName,
+                    options = SystemPromptMode.entries.map { it.displayName },
+                    onOptionSelected = { displayName ->
+                        val mode = SystemPromptMode.entries.first { it.displayName == displayName }
+                        if (mode == SystemPromptMode.CUSTOM) {
                             localSettings = localSettings.copy(
-                                provider = provider,
-                                model = defaultModel
+                                systemPromptMode = mode,
+                                responseFormat = ResponseFormat.TEXT
                             )
+                        } else {
+                            localSettings = localSettings.copy(systemPromptMode = mode)
                         }
-                    )
+                    }
+                )
 
-                    DropdownSettingItem(
-                        label = "Модель",
-                        selectedValue = localSettings.model.displayName,
-                        options = AiModel.forProvider(localSettings.provider).map { it.displayName },
-                        onOptionSelected = { displayName ->
-                            val model = AiModel.entries.first {
-                                it.displayName == displayName && it.provider == localSettings.provider
-                            }
-                            localSettings = localSettings.copy(model = model)
-                        }
-                    )
+                if (localSettings.systemPromptMode == SystemPromptMode.CUSTOM) {
+                    Column {
+                        Text(
+                            text = "Текст промпта",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    DropdownSettingItem(
-                        label = "Стиль общения",
-                        selectedValue = localSettings.communicationStyle.displayName,
-                        options = CommunicationStyle.entries.map { it.displayName },
-                        onOptionSelected = { displayName ->
-                            val style = CommunicationStyle.entries.first { it.displayName == displayName }
-                            localSettings = localSettings.copy(communicationStyle = style)
-                        }
-                    )
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    SwitchSettingItem(
-                        label = "Глубокое мышление",
-                        description = when (localSettings.provider) {
-                            AiProvider.DEEPSEEK -> "Использует deepseek-reasoner"
-                            AiProvider.OPENAI -> "Использует o1-preview"
-                            AiProvider.HUGGINGFACE -> "Недоступно для HuggingFace"
+                        OutlinedTextField(
+                            value = localSettings.customSystemPrompt,
+                            onValueChange = { newPrompt ->
+                                localSettings = localSettings.copy(customSystemPrompt = newPrompt)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Введите системный промпт...") },
+                            minLines = 3,
+                            maxLines = 6
+                        )
+                    }
+                }
+
+                SwitchSettingItem(
+                    label = "Суммаризация",
+                    checked = localSettings.summarization.enabled,
+                    onCheckedChange = { enabled ->
+                        localSettings = localSettings.copy(
+                            summarization = localSettings.summarization.copy(enabled = enabled)
+                        )
+                    }
+                )
+
+                if (localSettings.summarization.enabled) {
+                    SliderSettingItem(
+                        label = "Порог сообщений",
+                        value = localSettings.summarization.messageThreshold.toFloat(),
+                        onValueChange = { value ->
+                            localSettings = localSettings.copy(
+                                summarization = localSettings.summarization.copy(
+                                    messageThreshold = value.toInt()
+                                )
+                            )
                         },
-                        checked = localSettings.deepThinking,
-                        onCheckedChange = { enabled ->
-                            localSettings = localSettings.copy(deepThinking = enabled)
-                        },
-                        enabled = localSettings.provider != AiProvider.HUGGINGFACE
+                        valueRange = SummarizationSettings.MIN_MESSAGE_THRESHOLD.toFloat()..
+                                     SummarizationSettings.MAX_MESSAGE_THRESHOLD.toFloat(),
+                        steps = (SummarizationSettings.MAX_MESSAGE_THRESHOLD -
+                                 SummarizationSettings.MIN_MESSAGE_THRESHOLD) / 2 - 1,
+                        valueFormatter = { "${it.toInt()}" }
                     )
 
                     SliderSettingItem(
-                        label = "Температура",
-                        value = localSettings.temperature,
-                        onValueChange = { newTemp ->
-                            localSettings = localSettings.copy(temperature = newTemp)
-                        },
-                        valueRange = 0f..1.5f,
-                        steps = 14
-                    )
-
-                    if (localSettings.systemPromptMode != SystemPromptMode.CUSTOM) {
-                        DropdownSettingItem(
-                            label = "Формат ответа",
-                            selectedValue = localSettings.responseFormat.displayName,
-                            options = ResponseFormat.entries.map { it.displayName },
-                            onOptionSelected = { displayName ->
-                                val format = ResponseFormat.entries.first { it.displayName == displayName }
-                                localSettings = localSettings.copy(responseFormat = format)
-                            }
-                        )
-                    }
-
-                    DropdownSettingItem(
-                        label = "Системный промпт",
-                        selectedValue = localSettings.systemPromptMode.displayName,
-                        options = SystemPromptMode.entries.map { it.displayName },
-                        onOptionSelected = { displayName ->
-                            val mode = SystemPromptMode.entries.first { it.displayName == displayName }
-                            if (mode == SystemPromptMode.CUSTOM) {
-                                localSettings = localSettings.copy(
-                                    systemPromptMode = mode,
-                                    responseFormat = ResponseFormat.TEXT
-                                )
-                            } else {
-                                localSettings = localSettings.copy(systemPromptMode = mode)
-                            }
-                        }
-                    )
-
-                    if (localSettings.systemPromptMode == SystemPromptMode.CUSTOM) {
-                        Column {
-                            Text(
-                                text = "Текст промпта",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            OutlinedTextField(
-                                value = localSettings.customSystemPrompt,
-                                onValueChange = { newPrompt ->
-                                    localSettings = localSettings.copy(customSystemPrompt = newPrompt)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Введите системный промпт...") },
-                                minLines = 3,
-                                maxLines = 6
-                            )
-                        }
-                    }
-
-                    SwitchSettingItem(
-                        label = "Суммаризация",
-                        checked = localSettings.summarization.enabled,
-                        onCheckedChange = { enabled ->
+                        label = "Порог токенов (K)",
+                        value = (localSettings.summarization.tokenThreshold / 1000f),
+                        onValueChange = { value ->
                             localSettings = localSettings.copy(
-                                summarization = localSettings.summarization.copy(enabled = enabled)
-                            )
-                        }
-                    )
-
-                    if (localSettings.summarization.enabled) {
-                        SliderSettingItem(
-                            label = "Порог сообщений",
-                            value = localSettings.summarization.messageThreshold.toFloat(),
-                            onValueChange = { value ->
-                                localSettings = localSettings.copy(
-                                    summarization = localSettings.summarization.copy(
-                                        messageThreshold = value.toInt()
-                                    )
+                                summarization = localSettings.summarization.copy(
+                                    tokenThreshold = (value * 1000).toInt()
                                 )
-                            },
-                            valueRange = SummarizationSettings.MIN_MESSAGE_THRESHOLD.toFloat()..
-                                         SummarizationSettings.MAX_MESSAGE_THRESHOLD.toFloat(),
-                            steps = (SummarizationSettings.MAX_MESSAGE_THRESHOLD -
-                                     SummarizationSettings.MIN_MESSAGE_THRESHOLD) / 2 - 1,
-                            valueFormatter = { "${it.toInt()}" }
-                        )
-
-                        SliderSettingItem(
-                            label = "Порог токенов (K)",
-                            value = (localSettings.summarization.tokenThreshold / 1000f),
-                            onValueChange = { value ->
-                                localSettings = localSettings.copy(
-                                    summarization = localSettings.summarization.copy(
-                                        tokenThreshold = (value * 1000).toInt()
-                                    )
-                                )
-                            },
-                            valueRange = (SummarizationSettings.MIN_TOKEN_THRESHOLD / 1000f)..
-                                         (SummarizationSettings.MAX_TOKEN_THRESHOLD / 1000f),
-                            steps = 19,
-                            valueFormatter = { "${it.toInt()}K" }
-                        )
-
-                        Text(
-                            text = "Суммаризация сработает при превышении любого порога",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // RAG Section
-                    RagSection(
-                        ragEnabled = localSettings.ragEnabled,
-                        onRagEnabledChange = { enabled ->
-                            localSettings = localSettings.copy(ragEnabled = enabled)
-                            if (enabled) onCheckRagHealth()
-                        },
-                        ragConnectionState = ragConnectionState,
-                        ragDocumentsCount = ragDocuments.size,
-                        onAddDocuments = onShowRagAddDialog,
-                        onShowDocuments = onShowRagDocumentsDialog
-                    )
-
-                    // MCP Tools Section
-                    McpToolsSection(
-                        weatherEnabled = localSettings.mcpWeatherEnabled,
-                        reminderEnabled = localSettings.mcpReminderEnabled,
-                        reminderCheckIntervalMinutes = localSettings.reminderCheckIntervalMinutes,
-                        onWeatherChange = { enabled ->
-                            localSettings = localSettings.copy(mcpWeatherEnabled = enabled)
-                            if (enabled) onConnectMcp() else onDisconnectMcp()
-                        },
-                        onReminderChange = { enabled ->
-                            localSettings = localSettings.copy(mcpReminderEnabled = enabled)
-                        },
-                        onReminderIntervalChange = { interval ->
-                            localSettings = localSettings.copy(reminderCheckIntervalMinutes = interval)
-                        },
-                        connectionState = mcpConnectionState,
-                        toolsCount = mcpToolsCount,
-                        weatherCities = localSettings.weatherCities,
-                        selectedWeatherCity = localSettings.selectedWeatherCity,
-                        onCitySelected = { city ->
-                            localSettings = localSettings.copy(selectedWeatherCity = city)
-                        },
-                        onCityAdded = { newCity ->
-                            localSettings = localSettings.copy(
-                                weatherCities = localSettings.weatherCities + newCity,
-                                selectedWeatherCity = newCity
                             )
-                        }
+                        },
+                        valueRange = (SummarizationSettings.MIN_TOKEN_THRESHOLD / 1000f)..
+                                     (SummarizationSettings.MAX_TOKEN_THRESHOLD / 1000f),
+                        steps = 19,
+                        valueFormatter = { "${it.toInt()}K" }
                     )
 
-                    SwitchSettingItem(
-                        label = "Отправка по Shift+Enter",
-                        description = "Если выключено - Enter отправляет сообщение",
-                        checked = localSettings.sendMessageMode == SendMessageMode.SHIFT_ENTER,
-                        onCheckedChange = { isShiftEnter ->
-                            val mode = if (isShiftEnter) SendMessageMode.SHIFT_ENTER else SendMessageMode.ENTER
-                            localSettings = localSettings.copy(sendMessageMode = mode)
-                        }
+                    Text(
+                        text = "Суммаризация сработает при превышении любого порога",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                RagSection(
+                    ragEnabled = localSettings.ragEnabled,
+                    onRagEnabledChange = { enabled ->
+                        localSettings = localSettings.copy(ragEnabled = enabled)
+                        if (enabled) viewModel.checkRagHealth()
+                    },
+                    ragConnectionState = uiState.ragConnectionState,
+                    ragDocumentsCount = uiState.ragDocuments.size,
+                    onOpenSettings = viewModel::showRagSettingsDialog
+                )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                McpToolsSection(
+                    weatherEnabled = localSettings.mcpWeatherEnabled,
+                    reminderEnabled = localSettings.mcpReminderEnabled,
+                    reminderCheckIntervalMinutes = localSettings.reminderCheckIntervalMinutes,
+                    onWeatherChange = { enabled ->
+                        localSettings = localSettings.copy(mcpWeatherEnabled = enabled)
+                        if (enabled) viewModel.connectToMcp() else viewModel.disconnectMcp()
+                    },
+                    onReminderChange = { enabled ->
+                        localSettings = localSettings.copy(mcpReminderEnabled = enabled)
+                    },
+                    onReminderIntervalChange = { interval ->
+                        localSettings = localSettings.copy(reminderCheckIntervalMinutes = interval)
+                    },
+                    connectionState = uiState.mcpConnectionState,
+                    toolsCount = uiState.mcpTools.size,
+                    weatherCities = localSettings.weatherCities,
+                    selectedWeatherCity = localSettings.selectedWeatherCity,
+                    onCitySelected = { city ->
+                        localSettings = localSettings.copy(selectedWeatherCity = city)
+                    },
+                    onCityAdded = { newCity ->
+                        localSettings = localSettings.copy(
+                            weatherCities = localSettings.weatherCities + newCity,
+                            selectedWeatherCity = newCity
+                        )
+                    }
+                )
+
+                SwitchSettingItem(
+                    label = "Отправка по Shift+Enter",
+                    description = "Если выключено - Enter отправляет сообщение",
+                    checked = localSettings.sendMessageMode == SendMessageMode.SHIFT_ENTER,
+                    onCheckedChange = { isShiftEnter ->
+                        val mode = if (isShiftEnter) SendMessageMode.SHIFT_ENTER else SendMessageMode.ENTER
+                        localSettings = localSettings.copy(sendMessageMode = mode)
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { localSettings = defaultSettings },
+                    enabled = localSettings != defaultSettings,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    OutlinedButton(
-                        onClick = { localSettings = defaultSettings },
-                        enabled = localSettings != defaultSettings,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Сбросить")
-                    }
+                    Text("Сбросить")
+                }
 
-                    Button(
-                        onClick = {
-                            keyboardController?.hide()
-                            onSettingsChange(localSettings)
-                            onDismiss()
-                        },
-                        enabled = localSettings != settings,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Сохранить")
-                    }
+                Button(
+                    onClick = {
+                        keyboardController?.hide()
+                        viewModel.updateSettings(localSettings)
+                        onNavigateBack()
+                    },
+                    enabled = hasChanges,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Сохранить")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SettingsHeader(onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Настройки",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        IconButton(onClick = onDismiss) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Закрыть"
-            )
         }
     }
 }

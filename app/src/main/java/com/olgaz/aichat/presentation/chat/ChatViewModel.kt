@@ -11,6 +11,7 @@ import com.olgaz.aichat.domain.model.FileReadResult
 import com.olgaz.aichat.domain.model.McpServerConfig
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.MessageRole
+import com.olgaz.aichat.domain.model.RagRerankConfig
 import com.olgaz.aichat.domain.model.SummarizationInfo
 import com.olgaz.aichat.domain.repository.ChatHistoryRepository
 import com.olgaz.aichat.domain.repository.ChatRepository
@@ -24,7 +25,10 @@ import com.olgaz.aichat.domain.usecase.mcp.ObserveMcpConnectionUseCase
 import com.olgaz.aichat.domain.usecase.rag.CheckRagHealthUseCase
 import com.olgaz.aichat.domain.usecase.rag.DeleteRagDocumentUseCase
 import com.olgaz.aichat.domain.usecase.rag.GetRagDocumentsUseCase
+import com.olgaz.aichat.domain.usecase.rag.GetRagRerankConfigUseCase
 import com.olgaz.aichat.domain.usecase.rag.ObserveRagConnectionUseCase
+import com.olgaz.aichat.domain.usecase.rag.ResetRagRerankConfigUseCase
+import com.olgaz.aichat.domain.usecase.rag.UpdateRagRerankConfigUseCase
 import com.olgaz.aichat.domain.usecase.rag.UploadRagDocumentUseCase
 import com.olgaz.aichat.notification.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,7 +55,10 @@ class ChatViewModel @Inject constructor(
     private val uploadRagDocumentUseCase: UploadRagDocumentUseCase,
     private val getRagDocumentsUseCase: GetRagDocumentsUseCase,
     private val deleteRagDocumentUseCase: DeleteRagDocumentUseCase,
-    private val observeRagConnectionUseCase: ObserveRagConnectionUseCase
+    private val observeRagConnectionUseCase: ObserveRagConnectionUseCase,
+    private val getRagRerankConfigUseCase: GetRagRerankConfigUseCase,
+    private val updateRagRerankConfigUseCase: UpdateRagRerankConfigUseCase,
+    private val resetRagRerankConfigUseCase: ResetRagRerankConfigUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -143,6 +150,81 @@ class ChatViewModel @Inject constructor(
 
     fun hideRagAddDocumentDialog() {
         _uiState.update { it.copy(showRagAddDocumentDialog = false, ragError = null) }
+    }
+
+    fun showRagSettingsDialog() {
+        viewModelScope.launch {
+            getRagDocumentsUseCase.refresh()
+        }
+        loadRagRerankConfig()
+        _uiState.update { it.copy(showRagSettingsDialog = true) }
+    }
+
+    fun hideRagSettingsDialog() {
+        _uiState.update { it.copy(showRagSettingsDialog = false) }
+    }
+
+    fun loadRagRerankConfig() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRagConfig = true) }
+            getRagRerankConfigUseCase().fold(
+                onSuccess = { config ->
+                    _uiState.update {
+                        it.copy(ragRerankConfig = config, isLoadingRagConfig = false)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            ragError = error.message,
+                            isLoadingRagConfig = false
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun updateRagRerankConfig(config: RagRerankConfig) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingRagConfig = true) }
+            updateRagRerankConfigUseCase(config).fold(
+                onSuccess = { updatedConfig ->
+                    _uiState.update {
+                        it.copy(ragRerankConfig = updatedConfig, isSavingRagConfig = false)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            ragError = error.message,
+                            isSavingRagConfig = false
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun resetRagRerankConfig() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingRagConfig = true) }
+            resetRagRerankConfigUseCase().fold(
+                onSuccess = { config ->
+                    _uiState.update {
+                        it.copy(ragRerankConfig = config, isSavingRagConfig = false)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            ragError = error.message,
+                            isSavingRagConfig = false
+                        )
+                    }
+                }
+            )
+        }
     }
 
     fun clearRagError() {
@@ -413,14 +495,6 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
-    }
-
-    fun showSettingsDialog() {
-        _uiState.update { it.copy(isSettingsDialogVisible = true) }
-    }
-
-    fun hideSettingsDialog() {
-        _uiState.update { it.copy(isSettingsDialogVisible = false) }
     }
 
     fun updateSettings(settings: ChatSettings) {

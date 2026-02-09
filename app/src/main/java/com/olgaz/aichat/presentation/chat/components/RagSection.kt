@@ -30,8 +30,7 @@ fun RagSection(
     onRagEnabledChange: (Boolean) -> Unit,
     ragConnectionState: RagConnectionState,
     ragDocumentsCount: Int,
-    onAddDocuments: () -> Unit,
-    onShowDocuments: () -> Unit
+    onOpenSettings: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
 
@@ -49,25 +48,11 @@ fun RagSection(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            OutlinedButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.padding(start = 16.dp)
             ) {
-                OutlinedButton(
-                    onClick = onAddDocuments,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Добавить документ")
-                }
-
-                OutlinedButton(
-                    onClick = onShowDocuments,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Документы ($ragDocumentsCount)")
-                }
+                Text("Настройка")
             }
         }
     }

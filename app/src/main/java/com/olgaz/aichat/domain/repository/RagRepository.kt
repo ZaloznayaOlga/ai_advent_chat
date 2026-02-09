@@ -2,6 +2,7 @@ package com.olgaz.aichat.domain.repository
 
 import com.olgaz.aichat.domain.model.RagConnectionState
 import com.olgaz.aichat.domain.model.RagDocument
+import com.olgaz.aichat.domain.model.RagRerankConfig
 import com.olgaz.aichat.domain.model.RagSearchResponse
 import kotlinx.coroutines.flow.StateFlow
 
@@ -36,4 +37,19 @@ interface RagRepository {
      * @return количество удаленных чанков
      */
     suspend fun deleteDocument(name: String): Result<Int>
+
+    /**
+     * Получить конфигурацию реранкинга
+     */
+    suspend fun getRerankConfig(): Result<RagRerankConfig>
+
+    /**
+     * Обновить конфигурацию реранкинга
+     */
+    suspend fun updateRerankConfig(config: RagRerankConfig): Result<RagRerankConfig>
+
+    /**
+     * Сбросить конфигурацию реранкинга к значениям по умолчанию
+     */
+    suspend fun resetRerankConfig(): Result<RagRerankConfig>
 }

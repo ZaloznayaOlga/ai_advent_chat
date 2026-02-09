@@ -3,9 +3,12 @@ package com.olgaz.aichat.data.repository
 import android.util.Log
 import com.olgaz.aichat.data.remote.api.RagApi
 import com.olgaz.aichat.data.remote.dto.AddDocumentRequestDto
+import com.olgaz.aichat.data.remote.dto.RerankConfigUpdateDto
 import com.olgaz.aichat.data.remote.dto.SearchRequestDto
+import com.olgaz.aichat.data.remote.dto.UpdateRerankConfigRequestDto
 import com.olgaz.aichat.domain.model.RagConnectionState
 import com.olgaz.aichat.domain.model.RagDocument
+import com.olgaz.aichat.domain.model.RagRerankConfig
 import com.olgaz.aichat.domain.model.RagSearchResponse
 import com.olgaz.aichat.domain.model.RagSearchResult
 import com.olgaz.aichat.domain.repository.RagRepository
@@ -116,6 +119,74 @@ class RagRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Delete document failed", e)
+            Result.failure(Exception(mapError(e)))
+        }
+    }
+
+    override suspend fun getRerankConfig(): Result<RagRerankConfig> = withContext(Dispatchers.IO) {
+        try {
+            val response = ragApi.getRerankConfig()
+            if (response.success) {
+                val config = RagRerankConfig(
+                    rerankingEnabled = response.config.rerankingEnabled ?: false,
+                    filteringEnabled = response.config.filteringEnabled ?: false,
+                    minScore = response.config.minScore ?: 0.0f
+                )
+                Log.d(TAG, "Loaded rerank config: $config")
+                Result.success(config)
+            } else {
+                Result.failure(Exception("Не удалось получить конфигурацию"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Get rerank config failed", e)
+            Result.failure(Exception(mapError(e)))
+        }
+    }
+
+    override suspend fun updateRerankConfig(config: RagRerankConfig): Result<RagRerankConfig> =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = UpdateRerankConfigRequestDto(
+                    config = RerankConfigUpdateDto(
+                        rerankingEnabled = config.rerankingEnabled,
+                        filteringEnabled = config.filteringEnabled,
+                        minScore = config.minScore
+                    )
+                )
+                val response = ragApi.updateRerankConfig(request)
+                if (response.success) {
+                    val updatedConfig = RagRerankConfig(
+                        rerankingEnabled = response.config.rerankingEnabled ?: false,
+                        filteringEnabled = response.config.filteringEnabled ?: false,
+                        minScore = response.config.minScore ?: 0.0f
+                    )
+                    Log.i(TAG, "Rerank config updated: $updatedConfig")
+                    Result.success(updatedConfig)
+                } else {
+                    Result.failure(Exception("Не удалось обновить конфигурацию"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Update rerank config failed", e)
+                Result.failure(Exception(mapError(e)))
+            }
+        }
+
+    override suspend fun resetRerankConfig(): Result<RagRerankConfig> = withContext(Dispatchers.IO) {
+        try {
+            val response = ragApi.resetRerankConfig()
+            if (response.success && response.config != null) {
+                val config = RagRerankConfig(
+                    rerankingEnabled = response.config.rerankingEnabled ?: false,
+                    filteringEnabled = response.config.filteringEnabled ?: false,
+                    minScore = response.config.minScore ?: 0.0f
+                )
+                Log.i(TAG, "Rerank config reset to defaults: $config")
+                Result.success(config)
+            } else {
+                Result.failure(Exception("Не удалось сбросить конфигурацию"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Reset rerank config failed", e)
             Result.failure(Exception(mapError(e)))
         }
     }

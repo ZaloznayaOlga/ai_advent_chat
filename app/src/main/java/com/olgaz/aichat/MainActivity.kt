@@ -11,8 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import com.olgaz.aichat.notification.ReminderNotificationHelper
-import com.olgaz.aichat.presentation.chat.ChatScreen
 import com.olgaz.aichat.presentation.chat.ChatViewModel
+import com.olgaz.aichat.presentation.navigation.AppNavHost
 import com.olgaz.aichat.ui.theme.AIChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AIChatTheme {
-                ChatScreen(viewModel = viewModel)
+                AppNavHost(viewModel = viewModel)
             }
         }
     }

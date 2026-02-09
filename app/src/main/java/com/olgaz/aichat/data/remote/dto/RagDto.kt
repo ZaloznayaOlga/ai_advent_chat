@@ -68,3 +68,47 @@ data class HealthResponseDto(
     val documentsCount: Int,
     val chunksCount: Int
 )
+
+// Rerank Config DTOs
+
+@Serializable
+data class RerankConfigDto(
+    val rerankingEnabled: Boolean? = null,
+    val filteringEnabled: Boolean? = null,
+    val minScore: Float? = null,
+    val minTextLength: Int? = null,
+    val maxTextLength: Int? = null,
+    val minKeywordMatches: Int? = null
+)
+
+@Serializable
+data class GetRerankConfigResponseDto(
+    val success: Boolean,
+    val config: RerankConfigDto
+)
+
+@Serializable
+data class UpdateRerankConfigRequestDto(
+    val config: RerankConfigUpdateDto
+)
+
+@Serializable
+data class RerankConfigUpdateDto(
+    val rerankingEnabled: Boolean,
+    val filteringEnabled: Boolean,
+    val minScore: Float
+)
+
+@Serializable
+data class UpdateRerankConfigResponseDto(
+    val success: Boolean,
+    val config: RerankConfigDto,
+    val message: String? = null
+)
+
+@Serializable
+data class ResetRerankConfigResponseDto(
+    val success: Boolean,
+    val config: RerankConfigDto? = null,
+    val message: String? = null
+)

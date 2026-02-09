@@ -6,6 +6,7 @@ import com.olgaz.aichat.domain.model.McpTool
 import com.olgaz.aichat.domain.model.Message
 import com.olgaz.aichat.domain.model.RagConnectionState
 import com.olgaz.aichat.domain.model.RagDocument
+import com.olgaz.aichat.domain.model.RagRerankConfig
 
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
@@ -14,7 +15,6 @@ data class ChatUiState(
     val isSummarizing: Boolean = false,
     val error: String? = null,
     val settings: ChatSettings = ChatSettings(),
-    val isSettingsDialogVisible: Boolean = false,
     val attachedFile: AttachedFileInfo? = null,
     val isReadingFile: Boolean = false,
     val showSummaryButton: Boolean = false,
@@ -25,7 +25,11 @@ data class ChatUiState(
     val isUploadingRagDocument: Boolean = false,
     val showRagDocumentsDialog: Boolean = false,
     val showRagAddDocumentDialog: Boolean = false,
-    val ragError: String? = null
+    val showRagSettingsDialog: Boolean = false,
+    val ragError: String? = null,
+    val ragRerankConfig: RagRerankConfig = RagRerankConfig.DEFAULT,
+    val isLoadingRagConfig: Boolean = false,
+    val isSavingRagConfig: Boolean = false
 )
 
 data class AttachedFileInfo(
